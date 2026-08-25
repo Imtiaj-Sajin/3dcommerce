@@ -1,11 +1,13 @@
-// SoleSpace — a virtual sneaker shop you can walk around in.
-// Entry point: renderer, scene assembly, camera rig, interactions, UI, loop.
+// SoleSpace — a virtual sneaker shop you walk through in third person.
+// Entry point: renderer, scene assembly, player + chase camera, UI, loop.
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildShop, VIEWPOINTS } from './shop.js';
+import { loadCharacterGLBs, createRig } from './rig.js';
+import { Player } from './player.js';
 import { spawnVisitors } from './visitors.js';
-import { CameraRig } from './cameraRig.js';
+import { ThirdPersonCamera } from './cameraRig.js';
 import { Interactions } from './interactions.js';
 import { UI } from './ui.js';
 
@@ -28,65 +30,79 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.3;
 
 const camera = new THREE.PerspectiveCamera(
-  62, window.innerWidth / window.innerHeight, 0.1, 120
+  60, window.innerWidth / window.innerHeight, 0.1, 160
 );
 
 const shop = buildShop(scene, camera);
-const rig = new CameraRig(camera, canvas);
+const chaseCam = new ThirdPersonCamera(camera, canvas);
 
-// animated visitors browsing the shop (KayKit CC0 characters)
-const visitors = spawnVisitors(scene, shop.browsePoints, 7);
-visitors.ready.catch((err) => console.error('Could not load visitor models:', err));
+let player = null;
+let visitors = null;
+
+function goTo(zone) {
+  const vp = VIEWPOINTS[zone] ?? VIEWPOINTS.entrance;
+  if (player) player.setDestination(vp.pos);
+  chaseCam.faceDirection(vp.look.clone().sub(vp.pos));
+}
 
 const ui = new UI({
   onNavigate: (zone) => {
     ui.closeModal();
-    rig.navigateTo(VIEWPOINTS[zone] ?? VIEWPOINTS.entrance);
+    goTo(zone);
   },
-  productViews: shop.productViews,
 });
 
 const interactions = new Interactions(camera, canvas, shop.interactables, {
   onProduct: (id) => ui.openProduct(id),
   onSign: (zone) => {
     ui.setActiveZone(zone);
-    rig.navigateTo(VIEWPOINTS[zone]);
+    goTo(zone);
   },
-  onFloor: (point) => rig.walkTo(point),
+  onFloor: (point) => player?.setDestination(point),
 });
-interactions.setClickGuard(() => rig.wasClick() && !ui.modalOpen);
+interactions.setClickGuard(() => chaseCam.wasClick() && !ui.modalOpen);
 
-/* ---------------- intro ---------------- */
+/* ---------------- characters ---------------- */
 
-// Start high above the entrance, then glide down to eye level.
-rig.teleport(new THREE.Vector3(0, 7.6, 21), new THREE.Vector3(0, 1.2, 0));
-setTimeout(() => rig.navigateTo(VIEWPOINTS.entrance), 700);
-setTimeout(
-  () => ui.toast('Welcome to SoleSpace — drag to look around, WASD to walk 👟'),
-  2400
-);
+loadCharacterGLBs(['Knight', 'Barbarian', 'Rogue'])
+  .then((gltfs) => {
+    player = new Player(createRig(gltfs[2]), scene); // you play the Rogue
+    visitors = spawnVisitors(gltfs, scene, shop.browsePoints, shop.colliders, 8);
+    document.getElementById('loader').classList.add('fade');
+    setTimeout(
+      () => ui.toast('Welcome to SoleSpace — WASD to walk, drag to orbit, click a sneaker 👟'),
+      1600
+    );
+  })
+  .catch((err) => {
+    console.error('Could not load character models:', err);
+    document.getElementById('loader').classList.add('fade');
+  });
 
 /* ---------------- loop ---------------- */
 
 const clock = new THREE.Clock();
-let frames = 0;
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  if (!ui.modalOpen) {
-    rig.update(dt);
-    interactions.update(dt);
+  if (player) {
+    if (ui.modalOpen) {
+      player.keys.clear(); // don't keep walking behind the modal
+    } else {
+      player.update(dt, chaseCam.yaw, shop.colliders);
+      interactions.update(dt);
+    }
+    chaseCam.update(dt, player.root.position);
+  } else {
+    chaseCam.update(dt, new THREE.Vector3(0, 0, 12.2));
   }
-  shop.update(t, dt);
-  visitors.update(dt);
-  renderer.render(scene, camera);
 
-  if (++frames === 3) {
-    document.getElementById('loader').classList.add('fade');
-  }
+  shop.update(t, dt);
+  visitors?.update(dt);
+  renderer.render(scene, camera);
 }
 animate();
 

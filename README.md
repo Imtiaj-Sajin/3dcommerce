@@ -1,19 +1,17 @@
 # SoleSpace 👟
 
-A virtual sneaker shop you can walk around in — built with Three.js + Vite.
+A virtual sneaker shop you walk through in third person — built with
+Three.js + Vite.
 
-Visitors explore a daylight exhibition hall — brick walls, industrial
-windows with sun shafts, a mirror-polished floor — browse sneakers grouped
-by category (Running, Basketball, Lifestyle, and a rotating **Limited
-Drops** island), and click any product to open a detail view with image
-variants, colorways, sizes and a demo cart.
+You play a character (KayKit CC0 model) exploring an **L-shaped daylight
+showroom**: brick walls, industrial windows with sun shafts, ceiling beams
+with fluorescent strips, and a mirror-polished floor. Sneakers are shown as
+**real product photos** on floating display cards, grouped into brand zones
+— Nike, Jordan, adidas in the main hall, New Balance, ASICS, Converse in
+the wing, plus a rotating **SALE** island in the center. NPC visitors with
+name tags wander both halls and stop to browse, like a multiplayer lobby.
 
-Animated cartoon visitors (KayKit CC0 characters, `public/models/`) wander
-the shop with floating name tags, stopping to browse products like players
-in a multiplayer lobby.
-
-All environment materials (brick, concrete, tiles) and sneaker artwork are
-**generated procedurally** — the only binary assets are the character GLBs.
+> Product photos and brand names are used for demo/portfolio purposes only.
 
 ## Run it
 
@@ -26,38 +24,42 @@ npm run dev
 
 | Action | Input |
 | --- | --- |
-| Look around | Drag with the mouse / finger |
-| Walk | `W A S D` or arrow keys |
-| Walk to a spot | Click the floor |
-| Jump to a zone | Bottom nav pills, or click a neon wall sign |
-| Product details | Click a sneaker card or its pedestal |
+| Walk | `W A S D` / arrow keys (camera-relative) |
+| Run | hold `Shift` |
+| Orbit camera | drag with the mouse / finger |
+| Zoom | mouse wheel |
+| Walk to a spot | click the floor |
+| Go to a brand zone | bottom nav pills, or click a neon wall sign |
+| Product details | click a sneaker card or its pedestal |
 | Close / back | `Esc`, ✕, or click the backdrop |
 
 ## What's alive
 
-- Intro camera fly-in when the shop opens
-- Sunlight pours through the north windows with visible volumetric shafts;
+- Third-person chase camera with smooth easing and an intro pull-in
+- Sunlight pours through the windows with visible volumetric shafts;
   everything casts soft shadows on the reflective tiled floor
-- Animated visitors walk around, browse pedestals, and face the products
+- Animated visitors walk both halls, browse pedestals, face the products
 - Product cards float and sway above glowing pedestals
-- Neon signs pulse; dust motes drift through the light
-- The Limited Drops island slowly rotates
-- Hovering a card scales it up; picking a colorway in the modal
-  **repaints the card in the 3D shop live**
+- Neon brand signs pulse; dust motes drift through the light
+- The SALE island slowly rotates, with strikethrough sale pricing
 
 ## Structure
 
-```
+```text
 src/
   main.js          bootstrap, render loop, wiring
-  shop.js          the hall: walls, windows, floor mirror, zones, pedestals
-  visitors.js      animated wandering characters with name tags
+  shop.js          the L-shaped hall + zones, movement helpers (routing)
+  player.js        third-person character controller (WASD + click-to-walk)
+  cameraRig.js     chase camera (orbit, zoom, wall clamping)
+  visitors.js      NPC visitors wandering both halls
+  rig.js           shared character rig utilities (GLB load, name tags)
   textures.js      procedural brick / concrete / tile / light-shaft textures
-  products.js      catalog data (14 sneakers, 4 categories, colorways)
-  sneakerArt.js    procedural SVG sneakers + canvas card/sign textures
-  cameraRig.js     drag-look + WASD + smooth glides between zones
+  products.js      catalog: 25 real sneakers across 6 brands + sale
+  sneakerArt.js    photo product-card textures + neon sign textures
   interactions.js  raycast hover/click handling
-  ui.js            modal, colorways, sizes, cart drawer, toasts
+  ui.js            modal, sizes, sale pricing, cart drawer, toasts
   style.css        HUD / modal / cart styling
-public/models/     KayKit character GLBs (CC0 — see KAYKIT_LICENSE.txt)
+public/
+  models/          KayKit character GLBs (CC0 — see KAYKIT_LICENSE.txt)
+  products/        downloaded product photos (demo use)
 ```

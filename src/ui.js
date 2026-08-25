@@ -1,35 +1,28 @@
-// HTML overlay: product detail modal, colorways, sizes, cart drawer, toasts
-// and the bottom zone navigation.
+// HTML overlay: product detail modal, sizes, cart drawer, toasts and the
+// bottom brand navigation. Product photos come from public/products/.
 
-import { getProduct } from './products.js';
-import { sneakerDataURL } from './sneakerArt.js';
+import { getProduct, imgURL } from './products.js';
 
 const $ = (sel) => document.querySelector(sel);
 
 const VIEW_VARIANTS = [
-  { id: 'side', label: 'Side', cls: '' },
-  { id: 'flip', label: 'Reverse', cls: 'v-flip' },
+  { id: 'side', label: 'Photo', cls: '' },
+  { id: 'flip', label: 'Mirror', cls: 'v-flip' },
   { id: 'zoom', label: 'Detail', cls: 'v-zoom' },
-  { id: 'dark', label: 'Studio', cls: 'v-dark' },
 ];
 
 export class UI {
-  constructor({ onNavigate, productViews }) {
+  constructor({ onNavigate }) {
     this.onNavigate = onNavigate;
-    this.productViews = productViews; // Map from shop.js — lets colorway picks update the 3D card
     this.cart = [];
-    this.current = null;       // open product
-    this.paletteIndex = 0;
+    this.current = null;
     this.sizeChoice = null;
-    this.selectedPalettes = new Map(); // productId -> palette index
-
     this._bindStatic();
   }
 
   /* ---------------- static bindings ---------------- */
 
   _bindStatic() {
-    // zone nav
     document.querySelectorAll('#zone-nav button').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.setActiveZone(btn.dataset.zone);
@@ -37,12 +30,10 @@ export class UI {
       });
     });
 
-    // modal
     $('.modal-close').addEventListener('click', () => this.closeModal());
     $('.modal-backdrop').addEventListener('click', () => this.closeModal());
     $('#add-to-cart').addEventListener('click', () => this._addToCart());
 
-    // cart
     $('#cart-btn').addEventListener('click', () => this.toggleCart());
     $('#cart-close').addEventListener('click', () => this.toggleCart(false));
     $('#checkout-btn').addEventListener('click', () => {
@@ -74,24 +65,30 @@ export class UI {
     const p = getProduct(id);
     if (!p) return;
     this.current = p;
-    this.paletteIndex = this.selectedPalettes.get(id) ?? 0;
     this.sizeChoice = null;
 
     $('#modal-name').textContent = p.name;
-    $('#modal-price').textContent = `$${p.price}`;
     $('#modal-desc').textContent = p.desc;
     $('#modal-category').textContent = p.categoryName;
     $('#modal-category').style.color = p.accent;
     $('#modal-category').style.borderColor = p.accent;
+
+    const priceEl = $('#modal-price');
+    if (p.salePrice) {
+      priceEl.innerHTML = `<s>$${p.price}</s> <span class="sale-now">$${p.salePrice}</span>`;
+    } else {
+      priceEl.textContent = `$${p.price}`;
+    }
+
     const tag = $('#modal-tag');
     tag.classList.toggle('hidden', !p.tag);
     tag.textContent = p.tag || '';
+    tag.classList.toggle('chip-sale', !!p.salePrice);
 
-    this._renderColorways();
+    $('#modal-img').src = imgURL(p);
     this._renderSizes();
     this._renderVariants();
     this._setView('side');
-    this._updateImage();
 
     $('#modal').classList.remove('hidden');
   }
@@ -99,34 +96,6 @@ export class UI {
   closeModal() {
     $('#modal').classList.add('hidden');
     this.current = null;
-  }
-
-  _updateImage() {
-    const p = this.current;
-    $('#modal-img').src = sneakerDataURL(p.template, p.colorways[this.paletteIndex]);
-  }
-
-  _renderColorways() {
-    const p = this.current;
-    const wrap = $('#modal-colorways');
-    wrap.innerHTML = '';
-    p.colorways.forEach((c, i) => {
-      const b = document.createElement('button');
-      b.style.background = `linear-gradient(135deg, ${c.upper} 55%, ${c.accent} 55%)`;
-      b.title = `Colorway ${i + 1}`;
-      b.classList.toggle('active', i === this.paletteIndex);
-      b.addEventListener('click', () => {
-        this.paletteIndex = i;
-        this.selectedPalettes.set(p.id, i);
-        wrap.querySelectorAll('button').forEach((x, j) =>
-          x.classList.toggle('active', j === i)
-        );
-        this._updateImage();
-        // live-update the card floating in the 3D shop too
-        this.productViews.get(p.id)?.redraw(i);
-      });
-      wrap.appendChild(b);
-    });
   }
 
   _renderSizes() {
@@ -159,8 +128,7 @@ export class UI {
 
   _setView(id) {
     const v = VIEW_VARIANTS.find((x) => x.id === id);
-    const wrapEl = $('#modal-img-wrap');
-    wrapEl.className = `modal-img-wrap ${v.cls}`;
+    $('#modal-img-wrap').className = `modal-img-wrap ${v.cls}`;
     document.querySelectorAll('#modal-thumbs button').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === id)
     );
@@ -177,9 +145,8 @@ export class UI {
     this.cart.push({
       productId: p.id,
       name: p.name,
-      price: p.price,
+      price: p.salePrice ?? p.price,
       size: this.sizeChoice,
-      paletteIndex: this.paletteIndex,
     });
     this._refreshCartBadge();
     this.toast(`${p.name} (EU ${this.sizeChoice}) added to cart 🛒`);
@@ -210,11 +177,11 @@ export class UI {
       const row = document.createElement('div');
       row.className = 'cart-row';
       const img = document.createElement('img');
-      img.src = sneakerDataURL(p.template, p.colorways[item.paletteIndex]);
+      img.src = imgURL(p);
       const info = document.createElement('div');
       info.className = 'cr-info';
       info.innerHTML = `<div class="cr-name">${item.name}</div>
-        <div class="cr-meta">EU ${item.size} · CW ${item.paletteIndex + 1}</div>`;
+        <div class="cr-meta">${p.categoryName} · EU ${item.size}</div>`;
       const price = document.createElement('div');
       price.className = 'cr-price';
       price.textContent = `$${item.price}`;

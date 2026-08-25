@@ -1,163 +1,91 @@
-// Product catalog — 14 sneakers across 4 category zones.
-// palette keys: upper, overlay, sole, midsole, accent, lace, collar
+// Product catalog — real product photography (downloaded into
+// public/products/, white-background shots) organized by brand zones.
+// Brand names/photos are used for demo purposes only.
 
 export const CATEGORIES = [
-  { id: 'running',    name: 'Running',       accent: '#00e5ff', wall: 'west' },
-  { id: 'basketball', name: 'Basketball',    accent: '#ff9f1c', wall: 'north' },
-  { id: 'lifestyle',  name: 'Lifestyle',     accent: '#b980ff', wall: 'east' },
-  { id: 'limited',    name: 'Limited Drops', accent: '#ff2d75', wall: 'center' },
+  { id: 'nike',       name: 'Nike',        accent: '#ff6a2b' },
+  { id: 'jordan',     name: 'Jordan',      accent: '#e63946' },
+  { id: 'adidas',     name: 'adidas',      accent: '#4895ef' },
+  { id: 'newbalance', name: 'New Balance', accent: '#2ec4b6' },
+  { id: 'asics',      name: 'ASICS',       accent: '#9b5de5' },
+  { id: 'converse',   name: 'Converse',    accent: '#ffd166' },
+  { id: 'sale',       name: 'Sale',        accent: '#ff2d55' },
 ];
 
 const SIZES = [40, 41, 42, 43, 44, 45];
 
+function P(id, category, name, price, img, desc, extra = {}) {
+  return { id, category, name, price, img: `products/${img}.jpg`, desc, sizes: SIZES, ...extra };
+}
+
 export const PRODUCTS = [
-  /* ---------------- Running ---------------- */
-  {
-    id: 'velocity-flux', category: 'running', template: 'runner',
-    name: 'Velocity Flux', price: 129, tag: 'NEW',
-    desc: 'Featherlight tempo trainer with a rebound foam midsole and a breathable knit upper. Built for the runner who negotiates with red lights.',
-    colorways: [
-      { upper: '#1d2b3f', overlay: '#101b2b', sole: '#0c1018', midsole: '#f2f5f9', accent: '#00e5ff', lace: '#e8edf4', collar: '#0d1521' },
-      { upper: '#e9edf2', overlay: '#c9d2dd', sole: '#20242e', midsole: '#ffffff', accent: '#ff5470', lace: '#2a2f3a', collar: '#b8c2cf' },
-      { upper: '#233524', overlay: '#16241a', sole: '#101510', midsole: '#e6e9dd', accent: '#a4f04e', lace: '#dfe6d5', collar: '#111c14' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'aeroglide-2', category: 'running', template: 'runner',
-    name: 'AeroGlide 2', price: 139,
-    desc: 'Second generation of the crowd favorite. Softer landing, snappier toe-off, and a heel clip that hugs like it means it.',
-    colorways: [
-      { upper: '#f2f5f9', overlay: '#d8dee7', sole: '#1a1e28', midsole: '#ff8c42', accent: '#1d2b3f', lace: '#2a2f3a', collar: '#c6ceda' },
-      { upper: '#12263a', overlay: '#0a1826', sole: '#0a0d14', midsole: '#f2f5f9', accent: '#ff8c42', lace: '#e8edf4', collar: '#081220' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'pulse-runner', category: 'running', template: 'runner',
-    name: 'Pulse Runner', price: 119,
-    desc: 'Daily-miles workhorse. Grippy outsole, plush collar, zero drama. The pair you reach for without thinking.',
-    colorways: [
-      { upper: '#0f5c46', overlay: '#0a4032', sole: '#0c1210', midsole: '#eef3ef', accent: '#ffd166', lace: '#e6efe9', collar: '#083328' },
-      { upper: '#20242e', overlay: '#14171f', sole: '#0b0d12', midsole: '#3ddc97', accent: '#3ddc97', lace: '#cfd6e0', collar: '#101218' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'cloudstep', category: 'running', template: 'runner',
-    name: 'Cloudstep', price: 149, tag: 'BEST SELLER',
-    desc: 'Marshmallow stack height with a surprisingly stable ride. Long-run legs, saved. Clouds, but with traction.',
-    colorways: [
-      { upper: '#f6f2ec', overlay: '#e3dbd0', sole: '#d8dee7', midsole: '#ffffff', accent: '#8fd3f4', lace: '#cbc2b4', collar: '#d9d0c3' },
-      { upper: '#e9d8f2', overlay: '#d3bce3', sole: '#2a2438', midsole: '#ffffff', accent: '#b980ff', lace: '#c9b3da', collar: '#c9aede' },
-    ],
-    sizes: SIZES,
-  },
+  /* ---------------- Nike ---------------- */
+  P('dunk-panda', 'nike', 'Dunk Low "Panda"', 115, 'nike-dunk-panda',
+    'The black-and-white staple that refuses to stay in stock. Goes with everything you own.'),
+  P('af1-white', 'nike', 'Air Force 1 \'07', 110, 'nike-af1-a',
+    'Triple white. The most worn sneaker on planet Earth, and still undefeated.'),
+  P('dunk-grey-fog', 'nike', 'Dunk Low "Grey Fog"', 110, 'nike-dunk-fog',
+    'Soft grey overlays on crisp white leather. The Panda\'s calmer sibling.'),
+  P('kobe-6-grinch', 'nike', 'Kobe 6 "Reverse Grinch"', 190, 'nike-kobe6',
+    'Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', { tag: 'HEAT' }),
 
-  /* ---------------- Basketball ---------------- */
-  {
-    id: 'skyhook-pro', category: 'basketball', template: 'hightop',
-    name: 'Skyhook Pro', price: 159, tag: 'NEW',
-    desc: 'Lockdown high-top with a torsion plate and herringbone grip. For players who live above the rim — or plan to.',
-    colorways: [
-      { upper: '#b3122e', overlay: '#7e0c20', sole: '#14090c', midsole: '#f2f5f9', accent: '#f2f5f9', lace: '#f2f5f9', collar: '#5f0918' },
-      { upper: '#15181f', overlay: '#0b0d12', sole: '#0b0d12', midsole: '#b3122e', accent: '#b3122e', lace: '#d9dde3', collar: '#08090d' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'rim-reaper', category: 'basketball', template: 'hightop',
-    name: 'Rim Reaper', price: 169,
-    desc: 'Aggressive court cut with reinforced ankle wings. Comes with intimidation pre-installed.',
-    colorways: [
-      { upper: '#3b2a68', overlay: '#281c49', sole: '#141021', midsole: '#f4c95d', accent: '#f4c95d', lace: '#e8e2f4', collar: '#1e1536' },
-      { upper: '#101218', overlay: '#090a0f', sole: '#090a0f', midsole: '#7f5af0', accent: '#7f5af0', lace: '#cfd6e0', collar: '#06070b' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'fast-break', category: 'basketball', template: 'hightop',
-    name: 'Fast Break', price: 139,
-    desc: 'Guard-ready and lighter than it looks. First step so quick the defense files a complaint.',
-    colorways: [
-      { upper: '#1857b8', overlay: '#0f3d85', sole: '#0d1424', midsole: '#f2f5f9', accent: '#ffffff', lace: '#e8edf4', collar: '#0b2f68' },
-      { upper: '#f2f5f9', overlay: '#d8dee7', sole: '#1a1e28', midsole: '#1857b8', accent: '#1857b8', lace: '#2a2f3a', collar: '#c6ceda' },
-    ],
-    sizes: SIZES,
-  },
+  /* ---------------- Jordan ---------------- */
+  P('aj3-white-cement', 'jordan', 'Air Jordan 3 "White Cement"', 200, 'aj3-cement',
+    'Elephant print, visible Air, and history in every step. The \'88 icon reimagined.'),
+  P('aj4-military', 'jordan', 'Air Jordan 4 "Military Black"', 215, 'aj4-military',
+    'Clean white base, black hits, endless outfit rotation. A modern-day essential.', { tag: 'ICON' }),
+  P('aj11-cool-grey', 'jordan', 'Air Jordan 11 "Cool Grey"', 225, 'aj11-cool-grey',
+    'Patent leather shine in signature Cool Grey. Dress code approved, court certified.'),
 
-  /* ---------------- Lifestyle ---------------- */
-  {
-    id: 'metro-slip', category: 'lifestyle', template: 'slipon',
-    name: 'Metro Slip', price: 89,
-    desc: 'Slip in, head out. Elastic gore panel, cushioned footbed, and a silhouette that goes with literally everything.',
-    colorways: [
-      { upper: '#cbb794', overlay: '#ab9878', sole: '#3a352c', midsole: '#efe9dc', accent: '#5c6b4e', lace: '#cbb794', collar: '#8f7f63' },
-      { upper: '#3c4048', overlay: '#2a2d34', sole: '#17191e', midsole: '#e6e8ec', accent: '#d7a04c', lace: '#3c4048', collar: '#1f2228' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'court-classic', category: 'lifestyle', template: 'runner',
-    name: 'Court Classic', price: 99, tag: 'ICON',
-    desc: 'The clean white staple, reissued. Buttery leather look, gum details, timeless attitude since forever.',
-    colorways: [
-      { upper: '#f5f6f8', overlay: '#e2e5ea', sole: '#c9a96b', midsole: '#ffffff', accent: '#1c6e46', lace: '#eceef2', collar: '#d5d9e0' },
-      { upper: '#f5f6f8', overlay: '#e2e5ea', sole: '#20242e', midsole: '#ffffff', accent: '#b3122e', lace: '#eceef2', collar: '#d5d9e0' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'daily-drift', category: 'lifestyle', template: 'slipon',
-    name: 'Daily Drift', price: 95,
-    desc: 'Soft canvas, softer sole. Made for coffee runs, corner stores, and doing absolutely nothing in style.',
-    colorways: [
-      { upper: '#9aa2ae', overlay: '#7d8592', sole: '#2c2f36', midsole: '#f0f1f4', accent: '#ff7b6b', lace: '#9aa2ae', collar: '#6a7280' },
-      { upper: '#e8b4b8', overlay: '#d29a9f', sole: '#3a2e30', midsole: '#f7f0f0', accent: '#8c3f45', lace: '#e8b4b8', collar: '#c08a90' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'canvas-coast', category: 'lifestyle', template: 'runner',
-    name: 'Canvas Coast', price: 85,
-    desc: 'Beach-town energy in sneaker form. Salt-washed canvas and a rope-texture midsole detail.',
-    colorways: [
-      { upper: '#1f3a5f', overlay: '#142845', sole: '#c9bfa4', midsole: '#efe9d8', accent: '#efe9d8', lace: '#e6dfc9', collar: '#0f1e35' },
-      { upper: '#e8e2d2', overlay: '#d1c9b3', sole: '#2c3a4a', midsole: '#f6f2e8', accent: '#3c7a89', lace: '#c6bda5', collar: '#bdb298' },
-    ],
-    sizes: SIZES,
-  },
+  /* ---------------- adidas ---------------- */
+  P('samba-og', 'adidas', 'Samba OG', 100, 'samba-og',
+    'Terrace classic turned global fashion staple. White leather, gum sole, done.', { tag: 'TRENDING' }),
+  P('campus-00s', 'adidas', 'Campus 00s', 110, 'campus-00s',
+    'Chunky Y2K proportions with premium suede. The skate-shop look, revived.'),
+  P('superstar', 'adidas', 'Superstar', 95, 'superstar',
+    'Shell toe. Three stripes. Fifty years of street cred in one silhouette.'),
+  P('yeezy-350-zebra', 'adidas', 'Yeezy Boost 350 V2 "Zebra"', 230, 'yeezy-350-zebra',
+    'The unmistakable stripe pattern on Primeknit, riding full-length Boost.'),
 
-  /* ---------------- Limited Drops ---------------- */
-  {
-    id: 'neon-genesis', category: 'limited', template: 'hightop',
-    name: 'Neon Genesis', price: 249, tag: 'LIMITED',
-    desc: 'Blackout base, reactor-green hits. 500 pairs worldwide. Glows harder than your monitor at 3am.',
-    colorways: [
-      { upper: '#0d0f14', overlay: '#060709', sole: '#060709', midsole: '#39ff88', accent: '#39ff88', lace: '#39ff88', collar: '#03040a' },
-      { upper: '#0d0f14', overlay: '#060709', sole: '#060709', midsole: '#00e5ff', accent: '#00e5ff', lace: '#00e5ff', collar: '#03040a' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'gold-standard', category: 'limited', template: 'runner',
-    name: 'Gold Standard', price: 299, tag: 'LIMITED',
-    desc: 'Obsidian upper, 24-karat accents, numbered tongue tag. The flex is the point.',
-    colorways: [
-      { upper: '#15130e', overlay: '#0b0a07', sole: '#0b0a07', midsole: '#d4af37', accent: '#d4af37', lace: '#cdb662', collar: '#080705' },
-    ],
-    sizes: SIZES,
-  },
-  {
-    id: 'aurora-one', category: 'limited', template: 'slipon',
-    name: 'Aurora One', price: 279, tag: 'LIMITED',
-    desc: 'Color-shift coating sampled from a sky that only happens twice a year. Each pair is slightly different.',
-    colorways: [
-      { upper: '#7ae0d8', overlay: '#58b8c9', sole: '#1c2333', midsole: '#f2eefc', accent: '#c77dff', lace: '#7ae0d8', collar: '#3f93ab' },
-      { upper: '#c77dff', overlay: '#a75ee0', sole: '#241c33', midsole: '#f2eefc', accent: '#7ae0d8', lace: '#c77dff', collar: '#8b48c4' },
-    ],
-    sizes: SIZES,
-  },
+  /* ---------------- New Balance ---------------- */
+  P('nb-550', 'newbalance', '550 "White Grey"', 130, 'nb-550',
+    'The \'89 basketball shape that took over the streets. Perfectly aged proportions.'),
+  P('nb-2002r-rain', 'newbalance', '2002R "Rain Cloud"', 150, 'nb-2002r-rain',
+    'Protection Pack construction with soft layered greys. Comfort with edge.', { tag: 'NEW' }),
+  P('nb-9060', 'newbalance', '9060 "Sea Salt"', 160, 'nb-9060-sea-salt',
+    'Warped lines and creamy tones — a futurist remix of the classic 99X series.'),
+
+  /* ---------------- ASICS ---------------- */
+  P('gel-kayano-14', 'asics', 'GEL-Kayano 14', 150, 'asics-k14-silver',
+    'Y2K running tech turned runway favorite. White and pure silver mesh magic.', { tag: 'NEW' }),
+  P('gel-1130', 'asics', 'GEL-1130 "Clay Canyon"', 120, 'asics-1130',
+    'Retro runner DNA with modern comfort. The quiet flex of people who know.'),
+  P('gel-nyc-arctic', 'asics', 'GEL-NYC "Arctic Sky"', 130, 'asics-nyc-arctic',
+    'Layered cream and icy blue inspired by early-2000s city marathons.'),
+  P('gel-nyc-graphite', 'asics', 'GEL-NYC "Graphite"', 130, 'asics-nyc-graphite',
+    'Tonal grey stack with reflective hits. Urban camouflage, elevated.'),
+
+  /* ---------------- Converse ---------------- */
+  P('chuck-hi', 'converse', 'Chuck Taylor All Star Hi', 65, 'chuck-classic-hi',
+    'The canvas high-top that started it all. Every generation makes it theirs.'),
+  P('chuck-70-ox', 'converse', 'Chuck 70 Ox "Parchment"', 85, 'chuck-70-ox',
+    'Vintage-spec construction, warmer canvas, higher foxing. The connoisseur\'s Chuck.'),
+  P('run-star-hike', 'converse', 'Run Star Hike', 110, 'run-star-hike',
+    'The Chuck on a platform lugged sole. Height, attitude, and grip included.'),
+
+  /* ---------------- Sale (center island) ---------------- */
+  P('yeezy-foam-rnnr', 'sale', 'Yeezy Foam Runner "Onyx"', 90, 'yeezy-foam-rnnr',
+    'Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.',
+    { salePrice: 59, tag: 'SALE' }),
+  P('nb-530', 'sale', 'New Balance 530', 100, 'nb-530',
+    'Silvery retro runner with everyday comfort. Last sizes going fast.',
+    { salePrice: 69, tag: 'SALE' }),
+  P('gel-1130-black', 'sale', 'ASICS GEL-1130 "Black"', 120, 'asics-1130-black',
+    'The stealth colorway of the fan favorite. Discounted, not discontinued.',
+    { salePrice: 79, tag: 'SALE' }),
+  P('nb-1906r', 'sale', 'New Balance 1906R', 155, 'nb-1906r',
+    'Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.',
+    { salePrice: 99, tag: 'SALE' }),
 ];
 
 // Attach category metadata to each product for convenience.
@@ -165,6 +93,10 @@ const catById = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 for (const p of PRODUCTS) {
   p.categoryName = catById[p.category].name;
   p.accent = catById[p.category].accent;
+}
+
+export function imgURL(product) {
+  return import.meta.env.BASE_URL + product.img;
 }
 
 export function getProduct(id) {

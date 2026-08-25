@@ -150,7 +150,7 @@ html, body {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
-  padding: 9px 16px;
+  padding: 9px 13px;
   border-radius: 999px;
   cursor: pointer;
   letter-spacing: 0.4px;
@@ -159,6 +159,8 @@ html, body {
 }
 #zone-nav button:hover { color: var(--text); }
 #zone-nav button.active { background: var(--accent); color: #001318; }
+#zone-nav button.sale-btn { color: #ff5d7c; }
+#zone-nav button.sale-btn.active { background: #ff2d55; color: #fff; }
 
 /* ---------- Modal ---------- */
 #modal {
@@ -220,23 +222,21 @@ html, body {
   flex: 1;
   min-height: 260px;
   border-radius: 16px;
-  background: radial-gradient(ellipse at 50% 70%, #232838 0%, #14171f 75%);
+  background: radial-gradient(ellipse at 50% 65%, #ffffff 0%, #eceef1 85%);
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
   overflow: hidden;
 }
-.modal-img-wrap.v-dark { background: radial-gradient(ellipse at 50% 70%, #101019 0%, #06070b 75%); }
 #modal-img {
-  width: 88%;
+  width: 92%;
   max-height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.18));
   transition: transform 0.35s ease;
 }
 .modal-img-wrap.v-flip #modal-img { transform: scaleX(-1); }
-.modal-img-wrap.v-zoom #modal-img { transform: scale(2) translate(-12%, 6%); }
-.modal-img-wrap.v-dark #modal-img { filter: drop-shadow(0 0 26px rgba(120, 160, 255, 0.35)); }
+.modal-img-wrap.v-zoom #modal-img { transform: scale(2) translate(-10%, 8%); }
 
 .modal-thumbs { display: flex; gap: 8px; }
 .modal-thumbs button {
@@ -275,8 +275,11 @@ html, body {
   border-radius: 999px;
 }
 .chip-tag { color: #ffd166; border-color: #ffd166; }
+.chip-tag.chip-sale { color: #ff2d55; border-color: #ff2d55; }
 .modal-info h2 { font-size: 30px; letter-spacing: 0.5px; }
 .modal-price { font-size: 22px; font-weight: 700; color: var(--accent); }
+.modal-price s { color: var(--muted); font-weight: 500; margin-right: 8px; }
+.modal-price .sale-now { color: #ff2d55; }
 .modal-desc { color: var(--muted); font-size: 14px; line-height: 1.65; }
 
 .modal-section label {

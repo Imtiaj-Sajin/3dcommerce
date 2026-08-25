@@ -1,6 +1,10 @@
-// The exhibition hall — premium daylight showroom: brick walls, industrial
-// windows with sun shafts, ceiling beams with fluorescent strips, a mirror
-// floor, and the product zones (pedestals, cards, neon signs, island).
+// The exhibition hall — an L-shaped premium showroom.
+//
+//   MAIN HALL  x:[-23,23] z:[-15,15]   Nike / Jordan / adidas + SALE island
+//   WING       x:[3,23]   z:[15,40]    New Balance / ASICS / Converse
+//
+// Brick walls, industrial windows with sun shafts, ceiling beams with
+// fluorescent strips, a mirror floor, pedestals with photo product cards.
 
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
@@ -8,7 +12,40 @@ import { CATEGORIES, productsInCategory } from './products.js';
 import { buildCardTexture, buildSignTexture } from './sneakerArt.js';
 import { brickTexture, concreteTexture, tileTexture, shaftGradientTexture } from './textures.js';
 
-export const HALL = { w: 46, d: 30, h: 8 }; // x: ±23, z: ±15
+export const HALL = { h: 8 };
+
+export const RECTS = [
+  { x0: -23, x1: 23, z0: -15, z1: 15 }, // main hall
+  { x0: 3, x1: 23, z0: 15, z1: 40 },    // wing
+];
+
+export const JUNCTION = new THREE.Vector3(13, 0, 13);
+
+export function regionOf(z) {
+  return z <= 15 ? 0 : 1;
+}
+
+/** Clamp a point into the L-shaped floor plan (with wall margin). */
+export function clampToHall(x, z, m = 1.6) {
+  let best = null;
+  let bestD = Infinity;
+  for (const r of RECTS) {
+    const cx = THREE.MathUtils.clamp(x, r.x0 + m, r.x1 - m);
+    const cz = THREE.MathUtils.clamp(z, r.z0 + m, r.z1 - m);
+    const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: cx, z: cz };
+    }
+  }
+  return best;
+}
+
+/** Waypoint route between two floor points, going through the L junction. */
+export function routeTo(from, to) {
+  if (regionOf(from.z) === regionOf(to.z)) return [to.clone()];
+  return [JUNCTION.clone(), to.clone()];
+}
 
 const CARD_W = 1.4;
 const CARD_H = CARD_W * (640 / 512);
@@ -16,38 +53,33 @@ const PED_H = 1.0;
 
 /* ---------------- zone layout ---------------- */
 
-function zoneSlots(catId, count) {
-  const slots = [];
-  if (catId === 'running') {
-    const zs = [-8.25, -2.75, 2.75, 8.25];
-    for (let i = 0; i < count; i++)
-      slots.push({ pos: new THREE.Vector3(-19.5, 0, zs[i]), rotY: Math.PI / 2 });
-  } else if (catId === 'lifestyle') {
-    const zs = [8.25, 2.75, -2.75, -8.25];
-    for (let i = 0; i < count; i++)
-      slots.push({ pos: new THREE.Vector3(19.5, 0, zs[i]), rotY: -Math.PI / 2 });
-  } else if (catId === 'basketball') {
-    const xs = [-6, 0, 6];
-    for (let i = 0; i < count; i++)
-      slots.push({ pos: new THREE.Vector3(xs[i], 0, -11.5), rotY: 0 });
-  } else {
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2 + Math.PI / 2;
-      slots.push({
-        pos: new THREE.Vector3(Math.cos(a) * 2.3, 0.18, Math.sin(a) * 2.3),
-        rotY: -a + Math.PI / 2,
-      });
-    }
-  }
-  return slots;
-}
+const ZONES = {
+  nike:       { slots: [[-19.5, -8.25], [-19.5, -2.75], [-19.5, 2.75], [-19.5, 8.25]], rotY: Math.PI / 2 },
+  jordan:     { slots: [[-6, -11.5], [0, -11.5], [6, -11.5]], rotY: 0 },
+  adidas:     { slots: [[19.5, 8.25], [19.5, 2.75], [19.5, -2.75], [19.5, -8.25]], rotY: -Math.PI / 2 },
+  newbalance: { slots: [[6.5, 21], [6.5, 27.5], [6.5, 34]], rotY: Math.PI / 2 },
+  asics:      { slots: [[19.5, 19], [19.5, 24.5], [19.5, 30], [19.5, 35.5]], rotY: -Math.PI / 2 },
+  converse:   { slots: [[8, 36.5], [13, 36.5], [18, 36.5]], rotY: Math.PI },
+};
+
+const SIGNS = {
+  nike:       { pos: [-22.88, 5.2, 0], rotY: Math.PI / 2 },
+  jordan:     { pos: [0, 5.2, -14.88], rotY: 0 },
+  adidas:     { pos: [22.88, 5.2, 0], rotY: -Math.PI / 2 },
+  newbalance: { pos: [3.12, 5.2, 27.5], rotY: Math.PI / 2 },
+  asics:      { pos: [22.88, 5.2, 27.5], rotY: -Math.PI / 2 },
+  converse:   { pos: [13, 5.2, 39.88], rotY: Math.PI },
+};
 
 export const VIEWPOINTS = {
-  entrance:   { pos: new THREE.Vector3(0, 1.7, 13.2),  look: new THREE.Vector3(0, 1.6, 0) },
-  running:    { pos: new THREE.Vector3(-13, 1.7, 0),   look: new THREE.Vector3(-20, 1.8, 0) },
-  basketball: { pos: new THREE.Vector3(0, 1.7, -5),    look: new THREE.Vector3(0, 1.8, -12) },
-  lifestyle:  { pos: new THREE.Vector3(13, 1.7, 0),    look: new THREE.Vector3(20, 1.8, 0) },
-  limited:    { pos: new THREE.Vector3(0, 1.7, 7.2),   look: new THREE.Vector3(0, 1.7, 0) },
+  entrance:   { pos: new THREE.Vector3(0, 0, 12.2),    look: new THREE.Vector3(0, 0, 0) },
+  nike:       { pos: new THREE.Vector3(-14, 0, 0),     look: new THREE.Vector3(-20, 0, 0) },
+  jordan:     { pos: new THREE.Vector3(0, 0, -6),      look: new THREE.Vector3(0, 0, -12) },
+  adidas:     { pos: new THREE.Vector3(14, 0, 0),      look: new THREE.Vector3(20, 0, 0) },
+  newbalance: { pos: new THREE.Vector3(11, 0, 27.5),   look: new THREE.Vector3(5, 0, 27.5) },
+  asics:      { pos: new THREE.Vector3(15, 0, 27.5),   look: new THREE.Vector3(21, 0, 27.5) },
+  converse:   { pos: new THREE.Vector3(13, 0, 31),     look: new THREE.Vector3(13, 0, 38) },
+  sale:       { pos: new THREE.Vector3(0, 0, 7.4),     look: new THREE.Vector3(0, 0, 0) },
 };
 
 /* ---------------- main builder ---------------- */
@@ -55,45 +87,52 @@ export const VIEWPOINTS = {
 export function buildShop(scene, camera) {
   const interactables = [];
   const productViews = new Map();
-  const browsePoints = []; // spots where visitors stand to look at products
+  const browsePoints = [];
+  const colliders = [{ x: 0, z: 0, r: 4.7 }]; // sale island
   const animated = [];
   const pulsing = [];
 
-  /* --- floor: real mirror + polished tiles over it --- */
-  const mirror = new Reflector(new THREE.PlaneGeometry(HALL.w, HALL.d), {
+  /* --- floor: one big mirror + tiled overlays for each hall --- */
+  const mirror = new Reflector(new THREE.PlaneGeometry(46, 55), {
     clipBias: 0.003,
     textureWidth: 1024,
     textureHeight: 1024,
     color: 0xa8abb0,
   });
   mirror.rotation.x = -Math.PI / 2;
+  mirror.position.z = 12.5;
   scene.add(mirror);
 
-  const tiles = new THREE.Mesh(
-    new THREE.PlaneGeometry(HALL.w, HALL.d),
-    new THREE.MeshStandardMaterial({
-      map: tileTexture(),
+  const tileTex = tileTexture();
+  function tileFloor(w, d, x, z) {
+    const mat = new THREE.MeshStandardMaterial({
+      map: tileTex.clone(),
       transparent: true,
-      opacity: 0.84, // lets ~16% of the mirror bleed through = polished look
+      opacity: 0.84,
       roughness: 0.5,
       metalness: 0.05,
-    })
-  );
-  tiles.material.map.repeat.set(HALL.w / 4.6, HALL.d / 4.6);
-  tiles.rotation.x = -Math.PI / 2;
-  tiles.position.y = 0.02;
-  tiles.receiveShadow = true;
-  tiles.userData = { type: 'floor' };
-  scene.add(tiles);
-  interactables.push(tiles);
+    });
+    mat.map.repeat.set(w / 4.6, d / 4.6);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.02, z);
+    m.receiveShadow = true;
+    m.userData = { type: 'floor' };
+    scene.add(m);
+    interactables.push(m);
+  }
+  tileFloor(46, 30, 0, 0);      // main hall
+  tileFloor(20, 25, 13, 27.5);  // wing
 
-  // yellow guide markings like a real showroom floor
+  // yellow showroom guide markings
   const markMat = new THREE.MeshBasicMaterial({ color: 0xd9b53f, transparent: true, opacity: 0.75 });
   const marks = [
     { size: [34, 0.09], pos: [0, 0.035, -10.2] },
-    { size: [34, 0.09], pos: [0, 0.035, 11.6] },
-    { size: [0.09, 21.8], pos: [-17, 0.035, 0.7], flip: true },
-    { size: [0.09, 21.8], pos: [17, 0.035, 0.7], flip: true },
+    { size: [26, 0.09], pos: [-10, 0.035, 11.6] },
+    { size: [0.09, 21.8], pos: [-17, 0.035, 0.7] },
+    { size: [0.09, 21.8], pos: [17, 0.035, 0.7] },
+    { size: [0.09, 20], pos: [9.5, 0.035, 25] },
+    { size: [0.09, 20], pos: [16.5, 0.035, 25] },
   ];
   for (const m of marks) {
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(m.size[0], m.size[1]), markMat);
@@ -102,54 +141,62 @@ export function buildShop(scene, camera) {
     scene.add(plane);
   }
 
-  /* --- walls: brick front/back, light concrete on the signage sides --- */
-  const brick = brickTexture();
-  const brickMat = new THREE.MeshStandardMaterial({ map: brick, roughness: 0.92 });
-  const concrete = concreteTexture();
-  const concMat = new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.9 });
+  /* --- walls --- */
+  const brickTex = brickTexture();
+  const concTex = concreteTexture();
 
-  const walls = [
-    { mat: brickMat, size: [HALL.w, HALL.h], pos: [0, HALL.h / 2, -HALL.d / 2], rotY: 0, rep: [10.5, 2.8] },
-    { mat: brickMat, size: [HALL.w, HALL.h], pos: [0, HALL.h / 2, HALL.d / 2], rotY: Math.PI, rep: [10.5, 2.8] },
-    { mat: concMat, size: [HALL.d, HALL.h], pos: [-HALL.w / 2, HALL.h / 2, 0], rotY: Math.PI / 2, rep: [5, 1.4] },
-    { mat: concMat, size: [HALL.d, HALL.h], pos: [HALL.w / 2, HALL.h / 2, 0], rotY: -Math.PI / 2, rep: [5, 1.4] },
-  ];
-  for (const w of walls) {
-    const mat = w.mat.clone();
-    mat.map = w.mat.map.clone();
-    mat.map.repeat.set(...w.rep);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(...w.size), mat);
-    m.position.set(...w.pos);
-    m.rotation.y = w.rotY;
+  function wall(kind, w, pos, rotY) {
+    const src = kind === 'brick' ? brickTex : concTex;
+    const mat = new THREE.MeshStandardMaterial({
+      map: src.clone(),
+      roughness: kind === 'brick' ? 0.92 : 0.9,
+    });
+    mat.map.repeat.set(kind === 'brick' ? w / 4.4 : w / 6, kind === 'brick' ? 2.8 : 1.4);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, HALL.h), mat);
+    m.position.set(...pos);
+    m.rotation.y = rotY;
     m.receiveShadow = true;
     scene.add(m);
   }
+  wall('brick', 46, [0, 4, -15], 0);                    // north
+  wall('conc', 30, [-23, 4, 0], Math.PI / 2);           // west (main)
+  wall('conc', 55, [23, 4, 12.5], -Math.PI / 2);        // east (full length)
+  wall('brick', 26, [-10, 4, 15], Math.PI);             // south (main, beside wing opening)
+  wall('conc', 25, [3, 4, 27.5], Math.PI / 2);          // wing west
+  wall('brick', 20, [13, 4, 40], Math.PI);              // wing south
 
-  /* --- ceiling: dark concrete, exposed beams, fluorescent fixtures --- */
-  const ceilMat = new THREE.MeshStandardMaterial({ map: concreteTexture([52, 54, 58]), roughness: 1 });
-  ceilMat.map.repeat.set(8, 5);
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(HALL.w, HALL.d), ceilMat);
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.y = HALL.h;
-  scene.add(ceiling);
+  /* --- ceilings, beams, fluorescent fixtures --- */
+  const ceilTex = concreteTexture([52, 54, 58]);
+  function ceilingPlane(w, d, x, z) {
+    const mat = new THREE.MeshStandardMaterial({ map: ceilTex.clone(), roughness: 1 });
+    mat.map.repeat.set(w / 6, d / 6);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    m.rotation.x = Math.PI / 2;
+    m.position.set(x, HALL.h, z);
+    scene.add(m);
+  }
+  ceilingPlane(46, 30, 0, 0);
+  ceilingPlane(20, 25, 13, 27.5);
 
   const beamMat = new THREE.MeshStandardMaterial({ color: 0x1e2023, roughness: 0.7, metalness: 0.3 });
   const tubeMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, toneMapped: false });
-  for (const bz of [-12, -6, 0, 6, 12]) {
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(HALL.w, 0.55, 0.38), beamMat);
-    beam.position.set(0, HALL.h - 0.28, bz);
+  function beamRow(span, cx, cz, fixturesX) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 0.55, 0.38), beamMat);
+    beam.position.set(cx, HALL.h - 0.28, cz);
     scene.add(beam);
-    for (const fx of [-12, 0, 12]) {
+    for (const fx of fixturesX) {
       const housing = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.1, 0.42), beamMat);
-      housing.position.set(fx, HALL.h - 0.6, bz);
+      housing.position.set(fx, HALL.h - 0.6, cz);
       scene.add(housing);
       const tube = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.05, 0.3), tubeMat);
-      tube.position.set(fx, HALL.h - 0.66, bz);
+      tube.position.set(fx, HALL.h - 0.66, cz);
       scene.add(tube);
     }
   }
+  for (const bz of [-12, -6, 0, 6, 12]) beamRow(46, 0, bz, [-12, 0, 12]);
+  for (const bz of [18, 24, 30, 36]) beamRow(20, 13, bz, [8, 18]);
 
-  /* --- industrial windows on the brick walls --- */
+  /* --- industrial windows --- */
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.6, metalness: 0.4 });
   const paneMat = new THREE.MeshBasicMaterial({ color: 0xf6f9ff, toneMapped: false });
   const shaftTex = shaftGradientTexture();
@@ -164,11 +211,7 @@ export function buildShop(scene, camera) {
     if (dir < 0) pane.rotation.y = Math.PI;
     scene.add(pane);
 
-    // frame + mullions
-    const bars = [
-      [W + 0.24, 0.24, cy + H / 2], [W + 0.24, 0.24, cy - H / 2], // top/bottom
-    ];
-    for (const [bw, bh, by] of bars) {
+    for (const [bw, bh, by] of [[W + 0.24, 0.24, cy + H / 2], [W + 0.24, 0.24, cy - H / 2]]) {
       const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.18), frameMat);
       b.position.set(x, by, z);
       scene.add(b);
@@ -184,43 +227,40 @@ export function buildShop(scene, camera) {
       scene.add(b);
     }
 
-    // volumetric sun shaft falling into the room (north windows only)
     if (withShaft) {
-      const len = 10.2;
       const shaft = new THREE.Mesh(
-        new THREE.PlaneGeometry(W - 0.4, len),
+        new THREE.PlaneGeometry(W - 0.4, 10.2),
         new THREE.MeshBasicMaterial({
           map: shaftTex, color: 0xffedc9, transparent: true, opacity: 0.34,
           blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
         })
       );
-      // local +Y points from the floor landing spot back up to the window
       const up = new THREE.Vector3(0.28, 0.46, -0.84).normalize();
       shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
       shaft.position.set(x - 1.45, 2.35, wallZ + 4.3);
       scene.add(shaft);
     }
   }
-  addWindow(-10, -HALL.d / 2, true);
-  addWindow(10, -HALL.d / 2, true);
-  addWindow(-10, HALL.d / 2, false);
-  addWindow(10, HALL.d / 2, false);
+  addWindow(-10, -15, true);   // north wall, sun shafts
+  addWindow(10, -15, true);
+  addWindow(6.5, 40, false);   // wing south wall, flanking the Converse sign
+  addWindow(19.5, 40, false);
 
-  /* --- lighting: warm sun through the north windows + soft fill --- */
+  /* --- lighting --- */
   scene.add(new THREE.HemisphereLight(0xfff7ec, 0x8a8478, 0.85));
   scene.add(new THREE.AmbientLight(0x9aa2b5, 0.35));
 
   const sun = new THREE.DirectionalLight(0xffeed8, 3.2);
-  sun.position.set(8, 13, -24);
-  sun.target.position.set(0, 0, 2);
+  sun.position.set(8, 16, -30);
+  sun.target.position.set(0, 0, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -26;
-  sun.shadow.camera.right = 26;
-  sun.shadow.camera.top = 20;
-  sun.shadow.camera.bottom = -20;
+  sun.shadow.camera.left = -34;
+  sun.shadow.camera.right = 34;
+  sun.shadow.camera.top = 32;
+  sun.shadow.camera.bottom = -34;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 60;
+  sun.shadow.camera.far = 90;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.02;
   scene.add(sun, sun.target);
@@ -241,14 +281,13 @@ export function buildShop(scene, camera) {
     scene.add(cone);
   }
 
-  /* --- signage helpers --- */
+  /* --- signage --- */
   function addSign(text, accent, position, rotY, zone) {
-    // dark backing board so the neon pops on bright walls
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(7.7, 2.05),
       new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.55, metalness: 0.35 })
     );
-    board.position.copy(position);
+    board.position.set(...position);
     board.rotation.y = rotY;
     scene.add(board);
 
@@ -259,8 +298,7 @@ export function buildShop(scene, camera) {
         transparent: true, toneMapped: false,
       })
     );
-    sign.position.copy(position);
-    // nudge in front of the board along its facing direction
+    sign.position.set(...position);
     sign.position.x += Math.sin(rotY) * 0.04;
     sign.position.z += Math.cos(rotY) * 0.04;
     sign.rotation.y = rotY;
@@ -270,16 +308,15 @@ export function buildShop(scene, camera) {
     }
     scene.add(sign);
     pulsing.push({ material: sign.material, base: 0.88, amp: 0.12, speed: 1.8, phase: Math.random() * 6 });
-    return sign;
   }
 
-  addSign('SOLESPACE', '#00e5ff', new THREE.Vector3(0, 5.6, HALL.d / 2 - 0.1), Math.PI, null);
+  addSign('SOLESPACE', '#00e5ff', [-10, 5.6, 14.9], Math.PI, null);
 
   /* --- pedestal + card factory --- */
-  function addPedestal(product, slot, parent, accent) {
+  function addPedestal(product, slotPos, rotY, parent, accent) {
     const group = new THREE.Group();
-    group.position.copy(slot.pos);
-    group.rotation.y = slot.rotY;
+    group.position.copy(slotPos);
+    group.rotation.y = rotY;
 
     const ped = new THREE.Mesh(
       new THREE.CylinderGeometry(0.45, 0.52, PED_H, 32),
@@ -316,37 +353,34 @@ export function buildShop(scene, camera) {
     animated.push({ group: card, baseY, baseRotY: 0, phase: Math.random() * 6.28 });
     productViews.set(product.id, { group, card, redraw });
 
-    // visitors can come stand in front of wall pedestals
     if (parent === scene) {
-      const out = new THREE.Vector3(Math.sin(slot.rotY), 0, Math.cos(slot.rotY));
+      colliders.push({ x: slotPos.x, z: slotPos.z, r: 0.75 });
+      const out = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
       browsePoints.push({
-        pos: slot.pos.clone().addScaledVector(out, 1.9),
-        look: slot.pos.clone().setY(1.4),
+        pos: slotPos.clone().addScaledVector(out, 1.9),
+        look: slotPos.clone().setY(1.4),
       });
     }
   }
 
-  /* --- wall zones --- */
+  /* --- brand zones --- */
   for (const cat of CATEGORIES) {
+    if (cat.id === 'sale') continue;
     const items = productsInCategory(cat.id);
-    const slots = zoneSlots(cat.id, items.length);
-    if (cat.wall === 'center') continue;
+    const zone = ZONES[cat.id];
+    items.forEach((p, i) => {
+      const [x, z] = zone.slots[i % zone.slots.length];
+      addPedestal(p, new THREE.Vector3(x, 0, z), zone.rotY, scene, cat.accent);
+    });
+    const s = SIGNS[cat.id];
+    addSign(cat.name.toUpperCase(), cat.accent, s.pos, s.rotY, cat.id);
 
-    items.forEach((p, i) => addPedestal(p, slots[i], scene, cat.accent));
-
-    const off = 0.12;
-    let pos, rotY;
-    if (cat.wall === 'west') { pos = new THREE.Vector3(-HALL.w / 2 + off, 5.2, 0); rotY = Math.PI / 2; }
-    if (cat.wall === 'east') { pos = new THREE.Vector3(HALL.w / 2 - off, 5.2, 0); rotY = -Math.PI / 2; }
-    if (cat.wall === 'north') { pos = new THREE.Vector3(0, 5.2, -HALL.d / 2 + off); rotY = 0; }
-    addSign(cat.name.toUpperCase(), cat.accent, pos, rotY, cat.id);
-
-    const mid = slots[Math.floor(slots.length / 2)].pos;
-    zoneSpot(mid.x, mid.z, new THREE.Color(cat.accent));
+    const mid = zone.slots[Math.floor(zone.slots.length / 2)];
+    zoneSpot(mid[0], mid[1], new THREE.Color(cat.accent));
   }
 
-  /* --- limited drops: rotating center island --- */
-  const limited = CATEGORIES.find((c) => c.id === 'limited');
+  /* --- SALE: rotating center island --- */
+  const sale = CATEGORIES.find((c) => c.id === 'sale');
   const island = new THREE.Group();
   scene.add(island);
 
@@ -361,40 +395,49 @@ export function buildShop(scene, camera) {
 
   const islandRing = new THREE.Mesh(
     new THREE.TorusGeometry(3.55, 0.045, 12, 72),
-    new THREE.MeshBasicMaterial({ color: limited.accent, toneMapped: false, transparent: true })
+    new THREE.MeshBasicMaterial({ color: sale.accent, toneMapped: false, transparent: true })
   );
   islandRing.rotation.x = Math.PI / 2;
   islandRing.position.y = 0.19;
   island.add(islandRing);
   pulsing.push({ material: islandRing.material, base: 0.8, amp: 0.2, speed: 1.5, phase: 1 });
 
-  const limItems = productsInCategory('limited');
-  const limSlots = zoneSlots('limited', limItems.length);
-  limItems.forEach((p, i) => addPedestal(p, limSlots[i], island, limited.accent));
+  const saleItems = productsInCategory('sale');
+  saleItems.forEach((p, i) => {
+    const a = (i / saleItems.length) * Math.PI * 2 + Math.PI / 2;
+    addPedestal(
+      p,
+      new THREE.Vector3(Math.cos(a) * 2.3, 0.18, Math.sin(a) * 2.3),
+      -a + Math.PI / 2,
+      island,
+      sale.accent
+    );
+  });
 
-  const limSign = new THREE.Mesh(
-    new THREE.PlaneGeometry(6, 1.5),
+  const saleSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(5, 1.6),
     new THREE.MeshBasicMaterial({
-      map: buildSignTexture('LIMITED DROPS', limited.accent),
+      map: buildSignTexture('SALE %', sale.accent),
       transparent: true, toneMapped: false,
     })
   );
-  limSign.position.set(0, 4.9, 0);
-  limSign.userData = { type: 'sign', zone: 'limited' };
-  scene.add(limSign);
-  interactables.push(limSign);
-  pulsing.push({ material: limSign.material, base: 0.88, amp: 0.12, speed: 2.2, phase: 2 });
+  saleSign.position.set(0, 4.9, 0);
+  saleSign.userData = { type: 'sign', zone: 'sale' };
+  scene.add(saleSign);
+  interactables.push(saleSign);
+  pulsing.push({ material: saleSign.material, base: 0.88, amp: 0.12, speed: 2.4, phase: 2 });
 
-  zoneSpot(0, 0, new THREE.Color(limited.accent));
+  zoneSpot(0, 0, new THREE.Color(sale.accent));
 
-  /* --- dust motes drifting through the sunbeams --- */
-  const P_COUNT = 320;
+  /* --- dust motes --- */
+  const P_COUNT = 420;
   const pGeo = new THREE.BufferGeometry();
   const pPos = new Float32Array(P_COUNT * 3);
   for (let i = 0; i < P_COUNT; i++) {
-    pPos[i * 3] = (Math.random() - 0.5) * HALL.w * 0.9;
+    const inWing = i % 3 === 2;
+    pPos[i * 3] = inWing ? 3 + Math.random() * 20 : (Math.random() - 0.5) * 44;
     pPos[i * 3 + 1] = Math.random() * (HALL.h - 1) + 0.4;
-    pPos[i * 3 + 2] = (Math.random() - 0.5) * HALL.d * 0.9;
+    pPos[i * 3 + 2] = inWing ? 15 + Math.random() * 24 : (Math.random() - 0.5) * 28;
   }
   pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
   const particles = new THREE.Points(
@@ -416,16 +459,15 @@ export function buildShop(scene, camera) {
       p.material.opacity = p.base + Math.sin(t * p.speed + p.phase) * p.amp * 0.5;
     }
     island.rotation.y = t * 0.14;
-    limSign.lookAt(camera.position.x, limSign.position.y, camera.position.z);
+    saleSign.lookAt(camera.position.x, saleSign.position.y, camera.position.z);
 
     const arr = pGeo.attributes.position.array;
     for (let i = 0; i < P_COUNT; i++) {
       arr[i * 3 + 1] += dt * 0.14;
-      arr[i * 3] += Math.sin(t * 0.4 + i) * dt * 0.02;
       if (arr[i * 3 + 1] > HALL.h - 0.4) arr[i * 3 + 1] = 0.3;
     }
     pGeo.attributes.position.needsUpdate = true;
   }
 
-  return { interactables, productViews, browsePoints, update };
+  return { interactables, productViews, browsePoints, colliders, update };
 }

@@ -23,7 +23,7 @@
   <header id="hud-top">
     <div class="brand">SOLE<span>SPACE</span></div>
     <div class="hud-right">
-      <div class="hint-pill" id="controls-hint">🖱 drag to look&nbsp;·&nbsp;⌨ WASD to walk&nbsp;·&nbsp;👟 click a sneaker</div>
+      <div class="hint-pill" id="controls-hint">⌨ WASD walk · ⇧ run&nbsp;·&nbsp;🖱 drag orbit · wheel zoom&nbsp;·&nbsp;👟 click a sneaker</div>
       <button id="cart-btn" title="Your cart">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
         <span id="cart-count" class="hidden">0</span>
@@ -33,11 +33,14 @@
 
   <!-- Bottom zone navigation -->
   <nav id="zone-nav">
-    <button data-zone="entrance" class="active">⌂ Entrance</button>
-    <button data-zone="running">Running</button>
-    <button data-zone="basketball">Basketball</button>
-    <button data-zone="lifestyle">Lifestyle</button>
-    <button data-zone="limited">★ Limited</button>
+    <button data-zone="entrance" class="active">⌂</button>
+    <button data-zone="nike">Nike</button>
+    <button data-zone="jordan">Jordan</button>
+    <button data-zone="adidas">adidas</button>
+    <button data-zone="newbalance">New Balance</button>
+    <button data-zone="asics">ASICS</button>
+    <button data-zone="converse">Converse</button>
+    <button data-zone="sale" class="sale-btn">SALE %</button>
   </nav>
 
   <!-- Product detail modal -->
@@ -59,11 +62,6 @@
         <h2 id="modal-name">Sneaker Name</h2>
         <p class="modal-price" id="modal-price">$129</p>
         <p class="modal-desc" id="modal-desc"></p>
-
-        <div class="modal-section">
-          <label>Colorway</label>
-          <div class="colorways" id="modal-colorways"></div>
-        </div>
 
         <div class="modal-section">
           <label>Size (EU)</label>
