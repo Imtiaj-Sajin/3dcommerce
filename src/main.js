@@ -99,14 +99,6 @@ function applyQuality(level) {
   const dprCap = level === 0 ? 1.5 : level === 1 ? 1.15 : 1.0;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  if (level >= 2) {
-    shop.quality.mirror.visible = false;
-    for (const m of shop.quality.tileMaterials) {
-      m.opacity = 1;
-      m.transparent = false;
-      m.needsUpdate = true;
-    }
-  }
   console.info(`[SoleSpace] performance mode ${level}`);
 }
 

@@ -89,47 +89,102 @@ export function concreteTexture(base = [206, 202, 194]) {
   return tex;
 }
 
-/** Polished showroom floor tiles (drawn light — sits over the mirror). */
-export function tileTexture() {
-  const c = canvas(512, 512);
+/**
+ * Polished large-format showroom floor — the premium is baked into the
+ * texture (soft concrete mottling, thin light grout, polish streaks) and
+ * a matching roughness map makes the env-map sheen vary like real stone.
+ * One texture covers 4.6m of floor → each tile is 2.3m "large format".
+ */
+export function floorTextures() {
+  const S = 1024;
+  const c = canvas(S, S);
   const ctx = c.getContext('2d');
-  const T = 128; // 4×4 tiles per texture
 
-  for (let ty = 0; ty < 4; ty++) {
-    for (let tx = 0; tx < 4; tx++) {
-      const v = Math.round(jitter(210, 14));
-      ctx.fillStyle = `rgb(${v},${v - 2},${v - 6})`;
-      ctx.fillRect(tx * T, ty * T, T, T);
-      // subtle per-tile sheen gradient
-      const g = ctx.createLinearGradient(tx * T, ty * T, tx * T + T, ty * T + T);
-      g.addColorStop(0, 'rgba(255,255,255,0.06)');
-      g.addColorStop(1, 'rgba(0,0,0,0.05)');
-      ctx.fillStyle = g;
-      ctx.fillRect(tx * T, ty * T, T, T);
-    }
-  }
-  // grout
-  ctx.strokeStyle = 'rgba(96,92,84,0.85)';
-  ctx.lineWidth = 3;
-  for (let i = 0; i <= 4; i++) {
-    ctx.beginPath(); ctx.moveTo(i * T, 0); ctx.lineTo(i * T, 512); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * T); ctx.lineTo(512, i * T); ctx.stroke();
-  }
-  // light scratches
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 26; i++) {
-    ctx.beginPath();
-    const x = Math.random() * 512, y = Math.random() * 512;
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 130, y + (Math.random() - 0.5) * 130);
-    ctx.stroke();
+  // warm light-grey base
+  ctx.fillStyle = '#dad8d3';
+  ctx.fillRect(0, 0, S, S);
+
+  // large soft mottling — polished-concrete clouding
+  for (let i = 0; i < 30; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 130 + Math.random() * 280;
+    const g = ctx.createRadialGradient(x, y, 8, x, y, r);
+    const dark = Math.random() < 0.55;
+    g.addColorStop(0, dark
+      ? `rgba(118,114,106,${0.03 + Math.random() * 0.04})`
+      : `rgba(255,255,255,${0.03 + Math.random() * 0.04})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
 
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  // fine grain
+  for (let i = 0; i < 9000; i++) {
+    const v = Math.random() * 0.045;
+    ctx.fillStyle = Math.random() < 0.5 ? `rgba(0,0,0,${v})` : `rgba(255,255,255,${v})`;
+    ctx.fillRect(Math.random() * S, Math.random() * S, 1.4, 1.4);
+  }
+
+  // diagonal polish streaks
+  ctx.save();
+  ctx.translate(S / 2, S / 2);
+  ctx.rotate(-0.5);
+  for (let i = 0; i < 12; i++) {
+    const y = -S + Math.random() * S * 2;
+    const g = ctx.createLinearGradient(0, y - 26, 0, y + 26);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, `rgba(255,255,255,${0.02 + Math.random() * 0.025})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-S, y - 26, S * 2, 52);
+  }
+  ctx.restore();
+
+  // thin light grout with a subtle bevel highlight (2 tiles per texture)
+  for (const p of [0, S / 2]) {
+    ctx.fillStyle = 'rgba(150,146,138,0.55)';
+    ctx.fillRect(p, 0, 3, S);
+    ctx.fillRect(0, p, S, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(p + 3, 0, 1.5, S);
+    ctx.fillRect(0, p + 3, S, 1.5);
+  }
+
+  const map = new THREE.CanvasTexture(c);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+
+  // roughness map — darker = smoother = shinier
+  const rc = canvas(512, 512);
+  const rctx = rc.getContext('2d');
+  rctx.fillStyle = '#5a5a5a';
+  rctx.fillRect(0, 0, 512, 512);
+  rctx.save();
+  rctx.translate(256, 256);
+  rctx.rotate(-0.5);
+  for (let i = 0; i < 10; i++) {
+    const y = -512 + Math.random() * 1024;
+    const g = rctx.createLinearGradient(0, y - 30, 0, y + 30);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.5, `rgba(50,50,50,${0.35 + Math.random() * 0.3})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    rctx.fillStyle = g;
+    rctx.fillRect(-512, y - 30, 1024, 60);
+  }
+  rctx.restore();
+  for (let i = 0; i < 2600; i++) {
+    rctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.08})`;
+    rctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+  }
+  for (const p of [0, 256]) {
+    rctx.fillStyle = 'rgba(190,190,190,0.8)'; // grout is rougher
+    rctx.fillRect(p, 0, 2, 512);
+    rctx.fillRect(0, p, 512, 2);
+  }
+  const roughnessMap = new THREE.CanvasTexture(rc);
+  roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+
+  return { map, roughnessMap };
 }
 
 /** Vertical white→black gradient used as an additive sun-shaft. */

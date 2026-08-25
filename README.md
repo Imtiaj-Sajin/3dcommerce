@@ -5,7 +5,7 @@ Three.js + Vite.
 
 You play a character (KayKit CC0 model) exploring an **L-shaped daylight
 showroom**: brick walls, industrial windows with sun shafts, ceiling beams
-with fluorescent strips, and a mirror-polished floor. Sneakers are shown as
+with fluorescent strips, and a polished large-format stone floor. Sneakers are shown as
 **real product photos** on floating display cards, grouped into brand zones
 — Nike, Jordan, adidas in the main hall, New Balance, ASICS, Converse in
 the wing, plus a rotating **SALE** island in the center. NPC visitors with
@@ -37,7 +37,7 @@ npm run dev
 
 - Third-person chase camera with smooth easing and an intro pull-in
 - Sunlight pours through the windows with visible volumetric shafts;
-  everything casts soft shadows on the reflective tiled floor
+  everything casts soft shadows on the glossy stone floor
 - Animated visitors walk both halls, browse pedestals, face the products
 - Product cards float and sway above glowing pedestals
 - Neon brand signs pulse; dust motes drift through the light

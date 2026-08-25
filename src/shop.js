@@ -5,15 +5,14 @@
 //
 // Performance notes: all static trim (window frames, beams, fixtures,
 // panes, floor markings) is merged into a handful of draw calls; big matte
-// surfaces use cheap Lambert materials; the mirror floor renders at 512px,
-// every other frame, and skips the characters (layer 1).
+// surfaces use cheap Lambert materials; the floor's premium look is baked
+// into its textures + env-map sheen — no reflection render pass at all.
 
 import * as THREE from 'three';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CATEGORIES, productsInCategory } from './products.js';
 import { buildCardTexture, buildSignTexture } from './sneakerArt.js';
-import { brickTexture, concreteTexture, tileTexture, shaftGradientTexture } from './textures.js';
+import { brickTexture, concreteTexture, floorTextures, shaftGradientTexture } from './textures.js';
 
 export const HALL = { h: 8 };
 
@@ -94,7 +93,6 @@ export function buildShop(scene, camera) {
   const colliders = [{ x: 0, z: 0, r: 4.0 }]; // sale island
   const animated = [];
   const pulsing = [];
-  const tileMaterials = [];
 
   // merged-geometry buckets (one draw call each at the end)
   const metalGeos = []; // window frames, beams, fixture housings
@@ -108,36 +106,22 @@ export function buildShop(scene, camera) {
     arr.push(g);
   }
 
-  /* --- floor: one mirror (512px, half-rate, no characters) + tiles --- */
-  const mirror = new Reflector(new THREE.PlaneGeometry(46, 55), {
-    clipBias: 0.003,
-    textureWidth: 512,
-    textureHeight: 512,
-    color: 0xa8abb0,
-  });
-  mirror.rotation.x = -Math.PI / 2;
-  mirror.position.z = 12.5;
-  scene.add(mirror);
-
-  // the mirror sits under 84%-opaque tiles — updating it every other
-  // frame is invisible and halves its cost
-  const mirrorRender = mirror.onBeforeRender;
-  let mirrorFrame = 0;
-  mirror.onBeforeRender = (renderer, scn, cam, ...rest) => {
-    if ((mirrorFrame++ & 1) === 0) mirrorRender(renderer, scn, cam, ...rest);
-  };
-
-  const tileTex = tileTexture();
+  /* --- floor: polished large-format tiles, sheen from the env map ---
+   * No reflection pass — the glossy look comes from baked polish streaks
+   * plus a roughness map against the studio environment. Nearly free. */
+  const floorTex = floorTextures();
   function tileFloor(w, d, x, z) {
+    const map = floorTex.map.clone();
+    map.repeat.set(w / 4.6, d / 4.6);
+    const roughnessMap = floorTex.roughnessMap.clone();
+    roughnessMap.repeat.set(w / 4.6, d / 4.6);
     const mat = new THREE.MeshStandardMaterial({
-      map: tileTex.clone(),
-      transparent: true,
-      opacity: 0.84,
-      roughness: 0.5,
-      metalness: 0.05,
+      map,
+      roughnessMap,
+      roughness: 1, // the map carries the value (~0.35 base)
+      metalness: 0.16,
+      envMapIntensity: 1.15,
     });
-    mat.map.repeat.set(w / 4.6, d / 4.6);
-    tileMaterials.push(mat);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
@@ -493,12 +477,5 @@ export function buildShop(scene, camera) {
     pGeo.attributes.position.needsUpdate = true;
   }
 
-  return {
-    interactables,
-    productViews,
-    browsePoints,
-    colliders,
-    update,
-    quality: { mirror, tileMaterials },
-  };
+  return { interactables, productViews, browsePoints, colliders, update };
 }
