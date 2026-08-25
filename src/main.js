@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildShop, VIEWPOINTS } from './shop.js';
+import { spawnVisitors } from './visitors.js';
 import { CameraRig } from './cameraRig.js';
 import { Interactions } from './interactions.js';
 import { UI } from './ui.js';
@@ -15,15 +16,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0d12);
-scene.fog = new THREE.FogExp2(0x0b0d12, 0.016);
+scene.background = new THREE.Color(0x1a1c20);
 
 // Soft studio reflections for the glossy floor and pedestals
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.25;
+scene.environmentIntensity = 0.3;
 
 const camera = new THREE.PerspectiveCamera(
   62, window.innerWidth / window.innerHeight, 0.1, 120
@@ -31,6 +33,10 @@ const camera = new THREE.PerspectiveCamera(
 
 const shop = buildShop(scene, camera);
 const rig = new CameraRig(camera, canvas);
+
+// animated visitors browsing the shop (KayKit CC0 characters)
+const visitors = spawnVisitors(scene, shop.browsePoints, 7);
+visitors.ready.catch((err) => console.error('Could not load visitor models:', err));
 
 const ui = new UI({
   onNavigate: (zone) => {
@@ -75,6 +81,7 @@ function animate() {
     interactions.update(dt);
   }
   shop.update(t, dt);
+  visitors.update(dt);
   renderer.render(scene, camera);
 
   if (++frames === 3) {
