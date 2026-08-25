@@ -3,7 +3,7 @@
 // routing through the L-junction).
 
 import * as THREE from 'three';
-import { damp, angleLerp, nameTagSprite, resolveCollisions } from './rig.js';
+import { damp, angleLerp, resolveCollisions } from './rig.js';
 import { clampToHall, routeTo } from './shop.js';
 
 const WALK_SPEED = 2.6;
@@ -22,7 +22,6 @@ export class Player {
 
     this.root.position.set(0, 0, 12.2);
     this.root.rotation.y = this.heading;
-    this.root.add(nameTagSprite('YOU', '#00e5ff'));
     scene.add(this.root);
 
     window.addEventListener('keydown', (e) => {

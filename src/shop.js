@@ -95,10 +95,11 @@ export function buildShop(scene, camera) {
   const pulsing = [];
 
   // merged-geometry buckets (one draw call each at the end)
-  const metalGeos = []; // window frames, beams, fixture housings
-  const tubeGeos = [];  // emissive fluorescent tubes
-  const paneGeos = [];  // glowing window panes
-  const markGeos = [];  // yellow floor markings
+  const metalGeos = [];    // window frames, beams, fixture housings
+  const tubeGeos = [];     // fluorescent tubes, main hall (cool white)
+  const tubeGeosWing = []; // fluorescent tubes, wing (warm)
+  const paneGeos = [];     // glowing window panes
+  const markGeos = [];     // yellow floor markings
 
   function box(arr, w, h, d, x, y, z) {
     const g = new THREE.BoxGeometry(w, h, d);
@@ -182,15 +183,15 @@ export function buildShop(scene, camera) {
   ceilingPlane(46, 30, 0, 0);
   ceilingPlane(20, 25, 13, 27.5);
 
-  function beamRow(span, cx, cz, fixturesX) {
+  function beamRow(span, cx, cz, fixturesX, tubeArr) {
     box(metalGeos, span, 0.55, 0.38, cx, HALL.h - 0.28, cz);
     for (const fx of fixturesX) {
       box(metalGeos, 4.6, 0.1, 0.42, fx, HALL.h - 0.6, cz);
-      box(tubeGeos, 4.4, 0.05, 0.3, fx, HALL.h - 0.66, cz);
+      box(tubeArr, 4.4, 0.05, 0.3, fx, HALL.h - 0.66, cz);
     }
   }
-  for (const bz of [-12, -6, 0, 6, 12]) beamRow(46, 0, bz, [-12, 0, 12]);
-  for (const bz of [18, 24, 30, 36]) beamRow(20, 13, bz, [8, 18]);
+  for (const bz of [-12, -6, 0, 6, 12]) beamRow(46, 0, bz, [-12, 0, 12], tubeGeos);
+  for (const bz of [18, 24, 30, 36]) beamRow(20, 13, bz, [8, 18], tubeGeosWing);
 
   /* --- industrial windows --- */
   const shaftTex = shaftGradientTexture();
@@ -246,6 +247,10 @@ export function buildShop(scene, camera) {
     new THREE.MeshBasicMaterial({ color: 0xf2f6ff, toneMapped: false })
   ));
   scene.add(new THREE.Mesh(
+    mergeGeometries(tubeGeosWing),
+    new THREE.MeshBasicMaterial({ color: 0xffe3b8, toneMapped: false })
+  ));
+  scene.add(new THREE.Mesh(
     mergeGeometries(paneGeos),
     new THREE.MeshBasicMaterial({ color: 0xf6f9ff, toneMapped: false })
   ));
@@ -257,21 +262,37 @@ export function buildShop(scene, camera) {
   /* --- lighting --- */
   scene.add(new THREE.HemisphereLight(0xfff7ec, 0x8a8478, 1.05));
 
+  // The sun's shadow box is small and FOLLOWS THE PLAYER (see main.js) —
+  // all the shadow resolution is spent where the camera actually is,
+  // which keeps shadows crisp and soft instead of blocky.
   const sun = new THREE.DirectionalLight(0xffeed8, 3.2);
-  sun.position.set(8, 16, -30);
-  sun.target.position.set(0, 0, 8);
+  sun.position.set(6, 16, -10);
+  sun.target.position.set(0, 0, 12);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -34;
-  sun.shadow.camera.right = 34;
-  sun.shadow.camera.top = 32;
-  sun.shadow.camera.bottom = -34;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -16;
+  sun.shadow.camera.right = 16;
+  sun.shadow.camera.top = 16;
+  sun.shadow.camera.bottom = -16;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 90;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.03;
+  sun.shadow.camera.far = 70;
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.04;
   sun.shadow.camera.layers.enable(1); // characters cast shadows too
   scene.add(sun, sun.target);
+
+  // colored ambience accents — different mood per area, studio style:
+  // violet wash over the wing (matches ASICS/NB signage), cool cyan near
+  // the entrance, warm amber over the wing's Converse corner
+  const wingGlow = new THREE.PointLight(0xb47aff, 60, 28, 1.8);
+  wingGlow.position.set(13, 5.6, 24);
+  scene.add(wingGlow);
+  const entranceGlow = new THREE.PointLight(0x58d4ff, 38, 20, 1.8);
+  entranceGlow.position.set(-4, 5.2, 11);
+  scene.add(entranceGlow);
+  const converseGlow = new THREE.PointLight(0xffb86b, 42, 20, 1.8);
+  converseGlow.position.set(13, 5, 36);
+  scene.add(converseGlow);
 
   function zoneSpot(x, z, color) {
     const spot = new THREE.SpotLight(color, 140, 24, 0.55, 0.7, 1.8);
@@ -477,5 +498,5 @@ export function buildShop(scene, camera) {
     pGeo.attributes.position.needsUpdate = true;
   }
 
-  return { interactables, productViews, browsePoints, colliders, update };
+  return { interactables, productViews, browsePoints, colliders, update, sun };
 }

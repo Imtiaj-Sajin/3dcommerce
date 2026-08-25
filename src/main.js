@@ -23,7 +23,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1c20);
@@ -132,6 +132,12 @@ function animate() {
       if (player.isMoving) chaseCam.followBehind(player.heading, dt);
     }
     chaseCam.update(dt, player.root.position);
+
+    // the sun's small shadow box tracks the player — crisp shadows
+    // exactly where the camera is, at no extra cost
+    const pp = player.root.position;
+    shop.sun.position.set(pp.x + 6, 16, pp.z - 22);
+    shop.sun.target.position.set(pp.x, 0, pp.z);
   } else {
     chaseCam.update(dt, new THREE.Vector3(0, 0, 12.2));
   }
