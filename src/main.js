@@ -94,6 +94,8 @@ function animate() {
     } else {
       player.update(dt, chaseCam.yaw, shop.colliders);
       interactions.update(dt);
+      // camera swings in behind the character on its own while walking
+      if (player.isMoving) chaseCam.followBehind(player.heading, dt);
     }
     chaseCam.update(dt, player.root.position);
   } else {

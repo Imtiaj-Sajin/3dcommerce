@@ -2,7 +2,7 @@
 // wheel, and eases smoothly wherever the player goes.
 
 import * as THREE from 'three';
-import { damp } from './rig.js';
+import { damp, angleLerp } from './rig.js';
 import { clampToHall } from './shop.js';
 
 const PITCH_MIN = -0.1;
@@ -26,6 +26,7 @@ export class ThirdPersonCamera {
 
     this.dragging = false;
     this.moved = 0;
+    this.lastDragTime = -Infinity; // pause auto-follow right after manual aiming
 
     this._bind();
   }
@@ -46,6 +47,7 @@ export class ThirdPersonCamera {
       this.lastX = e.clientX;
       this.lastY = e.clientY;
       this.moved += Math.abs(dx) + Math.abs(dy);
+      if (this.moved > 4) this.lastDragTime = performance.now();
       this.targetYaw -= dx * 0.0042;
       this.targetPitch = THREE.MathUtils.clamp(
         this.targetPitch + dy * 0.003, PITCH_MIN, PITCH_MAX
@@ -65,6 +67,18 @@ export class ThirdPersonCamera {
   /** True when the last pointer gesture was a click, not a drag. */
   wasClick() {
     return this.moved < 8;
+  }
+
+  /**
+   * Auto-follow: while the character walks, gently swing the camera in
+   * behind them so no mouse input is needed. Suspended while dragging
+   * and for a moment after, so manual aiming always wins.
+   */
+  followBehind(heading, dt, strength = 2.4) {
+    if (this.dragging) return;
+    if (performance.now() - this.lastDragTime < 1300) return;
+    const desired = heading + Math.PI; // camera sits behind the move direction
+    this.targetYaw = angleLerp(this.targetYaw, desired, damp(strength, dt));
   }
 
   /** Swing the camera to look in a given ground direction (for zone nav). */

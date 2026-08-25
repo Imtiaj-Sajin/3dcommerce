@@ -25,20 +25,20 @@ export function regionOf(z) {
   return z <= 15 ? 0 : 1;
 }
 
-/** Clamp a point into the L-shaped floor plan (with wall margin). */
+/** Clamp a point into the L-shaped floor plan (with wall margin).
+ *  Clamps against the actual wall segments so the junction between the
+ *  two halls stays completely open — no dead zone at the seam. */
 export function clampToHall(x, z, m = 1.6) {
-  let best = null;
-  let bestD = Infinity;
-  for (const r of RECTS) {
-    const cx = THREE.MathUtils.clamp(x, r.x0 + m, r.x1 - m);
-    const cz = THREE.MathUtils.clamp(z, r.z0 + m, r.z1 - m);
-    const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
-    if (d < bestD) {
-      bestD = d;
-      best = { x: cx, z: cz };
-    }
+  x = THREE.MathUtils.clamp(x, -23 + m, 23 - m);
+  z = THREE.MathUtils.clamp(z, -15 + m, 40 - m);
+  // the notch outside the L (south-west of the wing opening)
+  if (z > 15 - m && x < 3 + m) {
+    const pushNorth = z - (15 - m);
+    const pushEast = (3 + m) - x;
+    if (pushNorth <= pushEast) z = 15 - m;
+    else x = 3 + m;
   }
-  return best;
+  return { x, z };
 }
 
 /** Waypoint route between two floor points, going through the L junction. */
@@ -88,7 +88,7 @@ export function buildShop(scene, camera) {
   const interactables = [];
   const productViews = new Map();
   const browsePoints = [];
-  const colliders = [{ x: 0, z: 0, r: 4.7 }]; // sale island
+  const colliders = [{ x: 0, z: 0, r: 4.0 }]; // sale island
   const animated = [];
   const pulsing = [];
 
