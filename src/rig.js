@@ -33,13 +33,19 @@ export function loadCharacterGLBs(names) {
   );
 }
 
-/** Clone + normalize a loaded gltf into a placeable, animatable rig. */
+/** Clone + normalize a loaded gltf into a placeable, animatable rig.
+ *  Characters live on layer 1: the main camera and the sun's shadow pass
+ *  render it, but the mirror floor does not — skinned meshes are by far
+ *  the most expensive thing to draw twice. */
 export function createRig(gltf) {
   const model = SkeletonUtils.clone(gltf.scene);
   model.traverse((o) => {
+    o.layers.set(1);
     if (o.isMesh) {
       o.castShadow = true;
-      o.frustumCulled = false; // skinned meshes pop with default culling
+      // cull normally, with an inflated bounds so animation never pops
+      o.geometry.computeBoundingSphere();
+      o.geometry.boundingSphere.radius *= 4;
       const src = o.material;
       o.material = new THREE.MeshLambertMaterial({
         map: src.map ?? null,
@@ -54,6 +60,7 @@ export function createRig(gltf) {
   const scale = CHARACTER_HEIGHT / Math.max(size.y, 0.001);
 
   const root = new THREE.Group();
+  root.layers.set(1);
   model.scale.setScalar(scale);
   model.position.y = -box.min.y * scale;
   root.add(model);
@@ -88,6 +95,7 @@ export function nameTagSprite(name, accent = 'rgba(255,255,255,0.25)') {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
   );
+  sprite.layers.set(1); // tags skip the mirror pass too
   sprite.scale.set(1.7, 0.42, 1);
   sprite.position.y = 1.95;
   return sprite;

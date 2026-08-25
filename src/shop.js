@@ -3,11 +3,14 @@
 //   MAIN HALL  x:[-23,23] z:[-15,15]   Nike / Jordan / adidas + SALE island
 //   WING       x:[3,23]   z:[15,40]    New Balance / ASICS / Converse
 //
-// Brick walls, industrial windows with sun shafts, ceiling beams with
-// fluorescent strips, a mirror floor, pedestals with photo product cards.
+// Performance notes: all static trim (window frames, beams, fixtures,
+// panes, floor markings) is merged into a handful of draw calls; big matte
+// surfaces use cheap Lambert materials; the mirror floor renders at 512px,
+// every other frame, and skips the characters (layer 1).
 
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CATEGORIES, productsInCategory } from './products.js';
 import { buildCardTexture, buildSignTexture } from './sneakerArt.js';
 import { brickTexture, concreteTexture, tileTexture, shaftGradientTexture } from './textures.js';
@@ -91,17 +94,38 @@ export function buildShop(scene, camera) {
   const colliders = [{ x: 0, z: 0, r: 4.0 }]; // sale island
   const animated = [];
   const pulsing = [];
+  const tileMaterials = [];
 
-  /* --- floor: one big mirror + tiled overlays for each hall --- */
+  // merged-geometry buckets (one draw call each at the end)
+  const metalGeos = []; // window frames, beams, fixture housings
+  const tubeGeos = [];  // emissive fluorescent tubes
+  const paneGeos = [];  // glowing window panes
+  const markGeos = [];  // yellow floor markings
+
+  function box(arr, w, h, d, x, y, z) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(x, y, z);
+    arr.push(g);
+  }
+
+  /* --- floor: one mirror (512px, half-rate, no characters) + tiles --- */
   const mirror = new Reflector(new THREE.PlaneGeometry(46, 55), {
     clipBias: 0.003,
-    textureWidth: 1024,
-    textureHeight: 1024,
+    textureWidth: 512,
+    textureHeight: 512,
     color: 0xa8abb0,
   });
   mirror.rotation.x = -Math.PI / 2;
   mirror.position.z = 12.5;
   scene.add(mirror);
+
+  // the mirror sits under 84%-opaque tiles — updating it every other
+  // frame is invisible and halves its cost
+  const mirrorRender = mirror.onBeforeRender;
+  let mirrorFrame = 0;
+  mirror.onBeforeRender = (renderer, scn, cam, ...rest) => {
+    if ((mirrorFrame++ & 1) === 0) mirrorRender(renderer, scn, cam, ...rest);
+  };
 
   const tileTex = tileTexture();
   function tileFloor(w, d, x, z) {
@@ -113,6 +137,7 @@ export function buildShop(scene, camera) {
       metalness: 0.05,
     });
     mat.map.repeat.set(w / 4.6, d / 4.6);
+    tileMaterials.push(mat);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
@@ -121,36 +146,31 @@ export function buildShop(scene, camera) {
     scene.add(m);
     interactables.push(m);
   }
-  tileFloor(46, 30, 0, 0);      // main hall
-  tileFloor(20, 25, 13, 27.5);  // wing
+  tileFloor(46, 30, 0, 0);
+  tileFloor(20, 25, 13, 27.5);
 
-  // yellow showroom guide markings
-  const markMat = new THREE.MeshBasicMaterial({ color: 0xd9b53f, transparent: true, opacity: 0.75 });
-  const marks = [
-    { size: [34, 0.09], pos: [0, 0.035, -10.2] },
-    { size: [26, 0.09], pos: [-10, 0.035, 11.6] },
-    { size: [0.09, 21.8], pos: [-17, 0.035, 0.7] },
-    { size: [0.09, 21.8], pos: [17, 0.035, 0.7] },
-    { size: [0.09, 20], pos: [9.5, 0.035, 25] },
-    { size: [0.09, 20], pos: [16.5, 0.035, 25] },
-  ];
-  for (const m of marks) {
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(m.size[0], m.size[1]), markMat);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.set(...m.pos);
-    scene.add(plane);
+  // yellow showroom guide markings (merged)
+  for (const [w, d, x, z] of [
+    [34, 0.09, 0, -10.2],
+    [26, 0.09, -10, 11.6],
+    [0.09, 21.8, -17, 0.7],
+    [0.09, 21.8, 17, 0.7],
+    [0.09, 20, 9.5, 25],
+    [0.09, 20, 16.5, 25],
+  ]) {
+    const g = new THREE.PlaneGeometry(w, d);
+    g.rotateX(-Math.PI / 2);
+    g.translate(x, 0.035, z);
+    markGeos.push(g);
   }
 
-  /* --- walls --- */
+  /* --- walls (cheap matte Lambert — they're big screen area) --- */
   const brickTex = brickTexture();
   const concTex = concreteTexture();
 
   function wall(kind, w, pos, rotY) {
     const src = kind === 'brick' ? brickTex : concTex;
-    const mat = new THREE.MeshStandardMaterial({
-      map: src.clone(),
-      roughness: kind === 'brick' ? 0.92 : 0.9,
-    });
+    const mat = new THREE.MeshLambertMaterial({ map: src.clone() });
     mat.map.repeat.set(kind === 'brick' ? w / 4.4 : w / 6, kind === 'brick' ? 2.8 : 1.4);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, HALL.h), mat);
     m.position.set(...pos);
@@ -168,7 +188,7 @@ export function buildShop(scene, camera) {
   /* --- ceilings, beams, fluorescent fixtures --- */
   const ceilTex = concreteTexture([52, 54, 58]);
   function ceilingPlane(w, d, x, z) {
-    const mat = new THREE.MeshStandardMaterial({ map: ceilTex.clone(), roughness: 1 });
+    const mat = new THREE.MeshLambertMaterial({ map: ceilTex.clone() });
     mat.map.repeat.set(w / 6, d / 6);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
     m.rotation.x = Math.PI / 2;
@@ -178,27 +198,17 @@ export function buildShop(scene, camera) {
   ceilingPlane(46, 30, 0, 0);
   ceilingPlane(20, 25, 13, 27.5);
 
-  const beamMat = new THREE.MeshStandardMaterial({ color: 0x1e2023, roughness: 0.7, metalness: 0.3 });
-  const tubeMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, toneMapped: false });
   function beamRow(span, cx, cz, fixturesX) {
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 0.55, 0.38), beamMat);
-    beam.position.set(cx, HALL.h - 0.28, cz);
-    scene.add(beam);
+    box(metalGeos, span, 0.55, 0.38, cx, HALL.h - 0.28, cz);
     for (const fx of fixturesX) {
-      const housing = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.1, 0.42), beamMat);
-      housing.position.set(fx, HALL.h - 0.6, cz);
-      scene.add(housing);
-      const tube = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.05, 0.3), tubeMat);
-      tube.position.set(fx, HALL.h - 0.66, cz);
-      scene.add(tube);
+      box(metalGeos, 4.6, 0.1, 0.42, fx, HALL.h - 0.6, cz);
+      box(tubeGeos, 4.4, 0.05, 0.3, fx, HALL.h - 0.66, cz);
     }
   }
   for (const bz of [-12, -6, 0, 6, 12]) beamRow(46, 0, bz, [-12, 0, 12]);
   for (const bz of [18, 24, 30, 36]) beamRow(20, 13, bz, [8, 18]);
 
   /* --- industrial windows --- */
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.6, metalness: 0.4 });
-  const paneMat = new THREE.MeshBasicMaterial({ color: 0xf6f9ff, toneMapped: false });
   const shaftTex = shaftGradientTexture();
 
   function addWindow(x, wallZ, withShaft) {
@@ -206,25 +216,18 @@ export function buildShop(scene, camera) {
     const z = wallZ + dir * 0.06;
     const W = 4.6, H = 3.4, cy = 4.7;
 
-    const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, H), paneMat);
-    pane.position.set(x, cy, z);
-    if (dir < 0) pane.rotation.y = Math.PI;
-    scene.add(pane);
+    const pane = new THREE.PlaneGeometry(W, H);
+    if (dir < 0) pane.rotateY(Math.PI);
+    pane.translate(x, cy, z);
+    paneGeos.push(pane);
 
-    for (const [bw, bh, by] of [[W + 0.24, 0.24, cy + H / 2], [W + 0.24, 0.24, cy - H / 2]]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.18), frameMat);
-      b.position.set(x, by, z);
-      scene.add(b);
-    }
+    box(metalGeos, W + 0.24, 0.24, 0.18, x, cy + H / 2, z);
+    box(metalGeos, W + 0.24, 0.24, 0.18, x, cy - H / 2, z);
     for (const off of [-W / 2, -W / 6, W / 6, W / 2]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, H + 0.2, 0.18), frameMat);
-      b.position.set(x + off, cy, z);
-      scene.add(b);
+      box(metalGeos, 0.14, H + 0.2, 0.18, x + off, cy, z);
     }
     for (const off of [-H / 6, H / 6]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, 0.16), frameMat);
-      b.position.set(x, cy + off, z);
-      scene.add(b);
+      box(metalGeos, W, 0.1, 0.16, x, cy + off, z);
     }
 
     if (withShaft) {
@@ -241,20 +244,40 @@ export function buildShop(scene, camera) {
       scene.add(shaft);
     }
   }
-  addWindow(-10, -15, true);   // north wall, sun shafts
+  addWindow(-10, -15, true);
   addWindow(10, -15, true);
-  addWindow(6.5, 40, false);   // wing south wall, flanking the Converse sign
+  addWindow(6.5, 40, false);
   addWindow(19.5, 40, false);
 
+  /* --- flush the merged static geometry (4 draw calls total) --- */
+  const metalMesh = new THREE.Mesh(
+    mergeGeometries(metalGeos),
+    new THREE.MeshLambertMaterial({ color: 0x212327 })
+  );
+  metalMesh.receiveShadow = true;
+  scene.add(metalMesh);
+
+  scene.add(new THREE.Mesh(
+    mergeGeometries(tubeGeos),
+    new THREE.MeshBasicMaterial({ color: 0xf2f6ff, toneMapped: false })
+  ));
+  scene.add(new THREE.Mesh(
+    mergeGeometries(paneGeos),
+    new THREE.MeshBasicMaterial({ color: 0xf6f9ff, toneMapped: false })
+  ));
+  scene.add(new THREE.Mesh(
+    mergeGeometries(markGeos),
+    new THREE.MeshBasicMaterial({ color: 0xd9b53f, transparent: true, opacity: 0.75 })
+  ));
+
   /* --- lighting --- */
-  scene.add(new THREE.HemisphereLight(0xfff7ec, 0x8a8478, 0.85));
-  scene.add(new THREE.AmbientLight(0x9aa2b5, 0.35));
+  scene.add(new THREE.HemisphereLight(0xfff7ec, 0x8a8478, 1.05));
 
   const sun = new THREE.DirectionalLight(0xffeed8, 3.2);
   sun.position.set(8, 16, -30);
   sun.target.position.set(0, 0, 8);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -34;
   sun.shadow.camera.right = 34;
   sun.shadow.camera.top = 32;
@@ -262,7 +285,8 @@ export function buildShop(scene, camera) {
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 90;
   sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.02;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.camera.layers.enable(1); // characters cast shadows too
   scene.add(sun, sun.target);
 
   function zoneSpot(x, z, color) {
@@ -285,7 +309,7 @@ export function buildShop(scene, camera) {
   function addSign(text, accent, position, rotY, zone) {
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(7.7, 2.05),
-      new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.55, metalness: 0.35 })
+      new THREE.MeshLambertMaterial({ color: 0x111318 })
     );
     board.position.set(...position);
     board.rotation.y = rotY;
@@ -319,7 +343,7 @@ export function buildShop(scene, camera) {
     group.rotation.y = rotY;
 
     const ped = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.45, 0.52, PED_H, 32),
+      new THREE.CylinderGeometry(0.45, 0.52, PED_H, 24),
       new THREE.MeshStandardMaterial({ color: 0xe8e6e1, metalness: 0.1, roughness: 0.4 })
     );
     ped.position.y = PED_H / 2;
@@ -329,7 +353,7 @@ export function buildShop(scene, camera) {
     group.add(ped);
 
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(0.46, 0.028, 12, 48),
+      new THREE.TorusGeometry(0.46, 0.028, 8, 36),
       new THREE.MeshBasicMaterial({ color: accent, toneMapped: false, transparent: true })
     );
     ring.rotation.x = Math.PI / 2;
@@ -394,7 +418,7 @@ export function buildShop(scene, camera) {
   island.add(platform);
 
   const islandRing = new THREE.Mesh(
-    new THREE.TorusGeometry(3.55, 0.045, 12, 72),
+    new THREE.TorusGeometry(3.55, 0.045, 8, 64),
     new THREE.MeshBasicMaterial({ color: sale.accent, toneMapped: false, transparent: true })
   );
   islandRing.rotation.x = Math.PI / 2;
@@ -430,7 +454,7 @@ export function buildShop(scene, camera) {
   zoneSpot(0, 0, new THREE.Color(sale.accent));
 
   /* --- dust motes --- */
-  const P_COUNT = 420;
+  const P_COUNT = 320;
   const pGeo = new THREE.BufferGeometry();
   const pPos = new Float32Array(P_COUNT * 3);
   for (let i = 0; i < P_COUNT; i++) {
@@ -469,5 +493,12 @@ export function buildShop(scene, camera) {
     pGeo.attributes.position.needsUpdate = true;
   }
 
-  return { interactables, productViews, browsePoints, colliders, update };
+  return {
+    interactables,
+    productViews,
+    browsePoints,
+    colliders,
+    update,
+    quality: { mirror, tileMaterials },
+  };
 }
