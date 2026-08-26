@@ -9,16 +9,42 @@ import { q } from '../lib/db.js';
 import { activeDiscounts, applyPricing } from '../lib/pricing.js';
 import { shapeAll } from '../lib/shape.js';
 
+// Same principle as the enrich agent: normalise the soft fields instead of
+// rejecting the whole plan. A model that answers sort="price_low_to_high"
+// understood the shopper perfectly - only its vocabulary was off.
+const SORTS = ['relevance', 'price_asc', 'price_desc', 'newest'];
+
+const sort = z.preprocess((v) => {
+  const s = String(v ?? '').toLowerCase().replace(/[\s-]+/g, '_');
+  if (SORTS.includes(s)) return s;
+  if (/(asc|low|cheap|min)/.test(s) && /price/.test(s)) return 'price_asc';
+  if (/(desc|high|expensive|max)/.test(s) && /price/.test(s)) return 'price_desc';
+  if (/new|recent|latest/.test(s)) return 'newest';
+  return 'relevance';
+}, z.enum(SORTS));
+
+const strList = (max, len) =>
+  z.preprocess(
+    (v) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean).slice(0, max) : []),
+    z.array(z.string().max(len))
+  );
+
+const cents = z.preprocess((v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}, z.number().int().nonnegative().nullable());
+
 export const filterSchema = z.object({
-  keywords: z.array(z.string().max(40)).max(8).default([]),
-  brands: z.array(z.string().max(60)).max(6).default([]),
-  category_slugs: z.array(z.string().max(60)).max(6).default([]),
-  colors: z.array(z.string().max(30)).max(5).default([]),
-  min_price_cents: z.number().int().nonnegative().nullable().default(null),
-  max_price_cents: z.number().int().nonnegative().nullable().default(null),
-  on_sale_only: z.boolean().default(false),
-  sort: z.enum(['relevance', 'price_asc', 'price_desc', 'newest']).default('relevance'),
-  explanation: z.string().max(240).default(''),
+  keywords: strList(8, 40),
+  brands: strList(6, 60),
+  category_slugs: strList(6, 60),
+  colors: strList(5, 30),
+  min_price_cents: cents,
+  max_price_cents: cents,
+  on_sale_only: z.preprocess((v) => v === true || v === 'true', z.boolean()),
+  sort,
+  explanation: z.preprocess((v) => String(v ?? '').slice(0, 240), z.string().max(240)),
 });
 
 const SYSTEM = `You convert a shopper's sentence into catalogue search filters for a sneaker store.

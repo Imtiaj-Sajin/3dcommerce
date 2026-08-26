@@ -63,11 +63,13 @@ export const REGISTRY = {
         return { data: { filters: planned.filters, results, explanation: planned.filters.explanation }, meta: planned.meta, flags: planned.flags };
       } catch (e) {
         // Never leave a shopper with nothing: fall back to keyword search.
+        // Record why, or silent degradation becomes invisible in the logs.
+        console.warn('[search] planned search failed, falling back:', e.message);
         const results = await plainSearch(p.query, p.spaceId, p.limit);
         return {
           data: { filters: null, results, explanation: 'Keyword results.', degraded: true },
           meta: null,
-          flags: ['search_fallback_plain'],
+          flags: ['search_fallback_plain', `cause:${String(e.message).slice(0, 120)}`],
         };
       }
     },

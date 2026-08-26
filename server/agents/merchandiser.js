@@ -10,17 +10,25 @@ import { screenInput, asUntrusted, validateOutput } from './guardrails.js';
 import { q } from '../lib/db.js';
 import { activeDiscounts, applyPricing } from '../lib/pricing.js';
 
+// Models often hand back ids as strings and occasionally wrap the list in an
+// object. Normalise rather than reject; unknown ids are dropped later anyway.
 export const merchSchema = z.object({
-  picks: z
-    .array(
-      z.object({
-        product_id: z.number().int().positive(),
-        reason: z.string().max(160),
-      })
-    )
-    .max(12),
-  headline: z.string().max(60).optional(),
-  subtitle: z.string().max(160).optional(),
+  picks: z.preprocess(
+    (v) => {
+      const list = Array.isArray(v) ? v : Array.isArray(v?.picks) ? v.picks : [];
+      return list
+        .map((p) => {
+          const id = Math.round(Number(typeof p === 'object' ? p?.product_id ?? p?.id : p));
+          if (!Number.isFinite(id) || id <= 0) return null;
+          return { product_id: id, reason: String((typeof p === 'object' && p?.reason) || '').slice(0, 160) };
+        })
+        .filter(Boolean)
+        .slice(0, 12);
+    },
+    z.array(z.object({ product_id: z.number().int().positive(), reason: z.string().max(160) })).max(12)
+  ),
+  headline: z.preprocess((v) => (v == null ? null : String(v).slice(0, 60)), z.string().max(60).nullable()),
+  subtitle: z.preprocess((v) => (v == null ? null : String(v).slice(0, 160)), z.string().max(160).nullable()),
 });
 
 const SYSTEM = `You are a visual merchandiser for a 3D sneaker store.
