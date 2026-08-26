@@ -134,14 +134,16 @@ export function buildShop(scene, camera) {
   tileFloor(46, 30, 0, 0);
   tileFloor(20, 35, 13, 32.5);
 
-  // yellow showroom guide markings (merged)
+  // Yellow showroom guide markings (merged) — one continuous circuit, not
+  // loose segments: every end here meets another line's end or crosses it.
+  // The x=17 run is a single stripe from the north wall clean through the
+  // junction to the back of the wing, so the lane reads as one path.
   for (const [w, d, x, z] of [
-    [34, 0.09, 0, -10.2],
-    [26, 0.09, -10, 11.6],
-    [0.09, 21.8, -17, 0.7],
-    [0.09, 21.8, 17, 0.7],
-    [0.09, 30, 9.5, 30],
-    [0.09, 30, 16.5, 30],
+    [34, 0.09, 0, -10.2],      // north cross-line   x -17..17
+    [40, 0.09, -3, 11.6],      // south cross-line   x -23..17
+    [0.09, 21.8, -17, 0.7],    // west lane          z -10.2..11.6
+    [0.09, 55.2, 17, 17.4],    // east lane          z -10.2..45  (through the junction)
+    [0.09, 33.4, 9.5, 28.3],   // wing inner lane    z  11.6..45
   ]) {
     const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
