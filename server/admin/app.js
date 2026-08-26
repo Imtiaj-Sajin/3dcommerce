@@ -10,6 +10,15 @@ const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = (cents) => '$' + (Number(cents || 0) / 100).toFixed(2).replace(/\.00$/, '');
 
+// mysql2 already parses JSON columns, so these arrive as arrays - but a
+// string can still turn up from an older row. Handle both.
+function flagText(v) {
+  if (!v) return '';
+  if (Array.isArray(v)) return v.join(', ');
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p.join(', ') : String(p); }
+  catch { return String(v); }
+}
+
 const state = {
   token: localStorage.getItem('mm_token') || '',
   user: null,
@@ -500,7 +509,7 @@ VIEWS.ai = async (el) => {
           <td class="muted">${j.tokens_in}/${j.tokens_out}</td>
           <td>$${Number(j.cost_usd).toFixed(5)}</td>
           <td class="muted">${j.latency_ms}</td>
-          <td class="muted">${esc(j.error || (j.guardrail_flags ? JSON.parse(j.guardrail_flags).join(', ') : ''))}</td>
+          <td class="muted">${esc(j.error || flagText(j.guardrail_flags))}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`;
