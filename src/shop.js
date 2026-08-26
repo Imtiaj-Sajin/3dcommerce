@@ -111,11 +111,20 @@ export function buildShop(scene, camera) {
    * No reflection pass — the glossy look comes from baked polish streaks
    * plus a roughness map against the studio environment. Nearly free. */
   const floorTex = floorTextures();
+  const TILE = 4.6; // world units per texture repeat (the sheet holds 2x2 tiles)
+
   function tileFloor(w, d, x, z) {
+    // UVs are driven off WORLD position, not off the slab's own corner, so
+    // both slabs sample one shared grid and the grout keeps running straight
+    // through the seam where the main hall opens into the wing.
+    const worldUV = (t) => {
+      t.repeat.set(w / TILE, d / TILE);
+      t.offset.set((x - w / 2) / TILE, -(z + d / 2) / TILE);
+    };
     const map = floorTex.map.clone();
-    map.repeat.set(w / 4.6, d / 4.6);
+    worldUV(map);
     const roughnessMap = floorTex.roughnessMap.clone();
-    roughnessMap.repeat.set(w / 4.6, d / 4.6);
+    worldUV(roughnessMap);
     const mat = new THREE.MeshStandardMaterial({
       map,
       roughnessMap,
@@ -134,16 +143,20 @@ export function buildShop(scene, camera) {
   tileFloor(46, 30, 0, 0);
   tileFloor(20, 35, 13, 32.5);
 
-  // Yellow showroom guide markings (merged) — one continuous circuit, not
-  // loose segments: every end here meets another line's end or crosses it.
-  // The x=17 run is a single stripe from the north wall clean through the
-  // junction to the back of the wing, so the lane reads as one path.
+  // Yellow showroom guide markings (merged) — one continuous circuit whose
+  // spacing is a single rule, so the lanes read as architecture and not as
+  // decoration:  a SIDE lane runs 2.5 out from its product row, an END line
+  // 1.3 in front of it.  That makes every lane sit 6 off its wall and stay
+  // symmetric about its hall's centre line (x=0 main, x=13 wing).
+  // Nothing crosses the mouth of the wing — the return line stops on the
+  // New Balance lane and hands off, leaving the junction open.
   for (const [w, d, x, z] of [
-    [34, 0.09, 0, -10.2],      // north cross-line   x -17..17
-    [40, 0.09, -3, 11.6],      // south cross-line   x -23..17
-    [0.09, 21.8, -17, 0.7],    // west lane          z -10.2..11.6
-    [0.09, 55.2, 17, 17.4],    // east lane          z -10.2..45  (through the junction)
-    [0.09, 33.4, 9.5, 28.3],   // wing inner lane    z  11.6..45
+    [34, 0.09, 0, -10.2],      // Jordan end line       x -17..17
+    [32, 0.09, -7, 11.6],      // main return line      x -23..9
+    [8, 0.09, 13, 45.2],       // Converse end line     x   9..17
+    [0.09, 21.8, -17, 0.7],    // Nike lane             z -10.2..11.6
+    [0.09, 55.4, 17, 17.5],    // adidas + ASICS lane   z -10.2..45.2
+    [0.09, 33.6, 9, 28.4],     // New Balance lane      z  11.6..45.2
   ]) {
     const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
