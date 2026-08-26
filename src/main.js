@@ -3,8 +3,10 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildShop, VIEWPOINTS } from './shop.js';
+import { buildShop, VIEWPOINTS, viewpointForSlot } from './shop.js';
 import { TENANTS } from './concourse.js';
+import { loadSpaceCatalogue, CATEGORIES, HIGHLIGHT, SPACE } from './products.js';
+import { fetchSpaces } from './api.js';
 import { loadCharacterGLBs, createRig } from './rig.js';
 import { Player } from './player.js';
 import { spawnVisitors } from './visitors.js';
@@ -39,6 +41,26 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.layers.enable(1); // characters live on layer 1 (skipped by the mirror)
 
+/* ---------------- catalogue ----------------
+ * The room cannot be built until we know what is in it, so the catalogue
+ * for THIS space is fetched first. Only one space is ever held in memory. */
+
+const spaceSlug = new URLSearchParams(location.search).get('space') || 'solespace';
+
+try {
+  await loadSpaceCatalogue(spaceSlug);
+} catch (err) {
+  console.error('[metamart] could not load the catalogue:', err);
+  document.getElementById('loader').innerHTML =
+    `<div class="loader-inner"><div class="loader-logo">META<span>MART</span></div>
+     <p style="color:#8b93a7;max-width:420px;line-height:1.6">
+       Could not reach the shop server.<br>Start it with <code>npm run server</code>
+       and reload.<br><br><span style="font-size:12px">${err.message}</span></p></div>`;
+  throw err;
+}
+
+buildZoneNav();
+
 const shop = buildShop(scene, camera);
 const chaseCam = new ThirdPersonCamera(camera, canvas);
 
@@ -46,9 +68,27 @@ let player = null;
 let visitors = null;
 
 function goTo(zone) {
-  const vp = VIEWPOINTS[zone] ?? VIEWPOINTS.entrance;
+  const cat = CATEGORIES.find((c) => c.id === zone);
+  const vp = cat ? viewpointForSlot(cat.slot) : VIEWPOINTS[zone] ?? VIEWPOINTS.entrance;
   if (player) player.setDestination(vp.pos);
   chaseCam.faceDirection(vp.look.clone().sub(vp.pos));
+}
+
+/** The bottom nav is built from whatever categories this space actually has. */
+function buildZoneNav() {
+  const nav = document.getElementById('zone-nav');
+  if (!nav) return;
+  const buttons = [
+    `<button data-zone="entrance" class="active" title="Entrance">⌂</button>`,
+    ...CATEGORIES.map((c) => `<button data-zone="${c.id}">${c.name}</button>`),
+  ];
+  if (HIGHLIGHT) {
+    buttons.push(
+      `<button data-zone="sale" class="sale-btn" style="--hl:${HIGHLIGHT.accent}">${HIGHLIGHT.title}</button>`
+    );
+  }
+  buttons.push(`<button data-zone="concourse">Concourse ↗</button>`);
+  nav.innerHTML = buttons.join('');
 }
 
 const ui = new UI({
@@ -65,11 +105,43 @@ const interactions = new Interactions(camera, canvas, shop.interactables, {
     goTo(zone);
   },
   onFloor: (point) => player?.setDestination(point),
-  onTenant: (id) => {
-    const t = TENANTS.find((x) => x.id === id);
-    ui.toast(`${t ? t.name : 'This store'} — leasing now, opening soon on METAMART 🏗️`);
-  },
+  onTenant: (id) => enterSpace(id),
 });
+
+/* ---------------- moving between spaces ----------------
+ * Every store occupies the same footprint, so only one can exist at a time.
+ * Entering a bay swaps the whole space: the current one is torn down and the
+ * next one is fetched and built. There is no door to open - you walk into the
+ * bay and you are there. */
+
+let directory = [];
+fetchSpaces()
+  .then((rows) => { directory = rows; })
+  .catch(() => { /* the plaza still works without status labels */ });
+
+function enterSpace(slug) {
+  const entry = directory.find((s) => s.slug === slug);
+  const tenant = TENANTS.find((t) => t.id === slug);
+  const name = entry?.name || tenant?.name || 'This store';
+
+  if (entry && entry.status !== 'live') {
+    ui.toast(`${name} — leasing now, opening soon on METAMART 🏗️`);
+    return;
+  }
+  if (!entry) {
+    ui.toast(`${name} — not open yet 🏗️`);
+    return;
+  }
+
+  ui.toast(`Entering ${name}…`);
+  const loader = document.getElementById('loader');
+  loader.classList.remove('fade');
+  // A full reload is deliberate: it guarantees the previous space's meshes,
+  // textures and NPCs are gone rather than lingering in GPU memory.
+  setTimeout(() => {
+    location.search = `?space=${encodeURIComponent(slug)}`;
+  }, 450);
+}
 interactions.setClickGuard(() => chaseCam.wasClick() && !ui.modalOpen);
 
 /* ---------------- characters ---------------- */
@@ -85,7 +157,7 @@ loadCharacterGLBs(['Knight', 'Barbarian', 'Rogue'])
       window.__solespace = { scene, camera, shop, ui, player, visitors, cam: chaseCam };
     }
     setTimeout(
-      () => ui.toast('Welcome to SoleSpace — WASD to walk, drag to orbit, click a sneaker 👟'),
+      () => ui.toast(`Welcome to ${SPACE.name} — WASD to walk, drag to orbit, click a product 👟`),
       1600
     );
   })

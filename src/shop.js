@@ -13,7 +13,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CATEGORIES, productsInCategory } from './products.js';
+import { CATEGORIES, productsInCategory, HIGHLIGHT } from './products.js';
 import { buildCardTexture, buildSignTexture } from './sneakerArt.js';
 import { brickTexture, concreteTexture, floorTextures, shaftGradientTexture } from './textures.js';
 import {
@@ -195,6 +195,16 @@ const SIGNS = {
   asics:      { pos: [22.88, 5.2, 31], rotY: -Math.PI / 2 },
   converse:   { pos: [13, 5.2, 49.88], rotY: Math.PI },
 };
+
+// Physical wall positions in this room, in slot order. A category with
+// slot_index 0 goes on the first wall, 1 on the second, and so on - the keys
+// below are wall names that happen to be named after the launch brands.
+export const ZONE_ORDER = ['nike', 'jordan', 'adidas', 'newbalance', 'asics', 'converse'];
+
+/** Where the camera should stand to look at a given category slot. */
+export function viewpointForSlot(slot) {
+  return VIEWPOINTS[ZONE_ORDER[slot]] ?? VIEWPOINTS.entrance;
+}
 
 export const VIEWPOINTS = {
   entrance:   { pos: new THREE.Vector3(0, 0, 12.2),    look: new THREE.Vector3(0, 0, 0) },
@@ -548,24 +558,29 @@ export function buildShop(scene, camera) {
     }
   }
 
-  /* --- brand zones --- */
+  /* --- category zones ---
+   * Zones are addressed by SLOT, not by brand name, so whatever categories
+   * the database hands us drop into the room's physical wall positions. */
   for (const cat of CATEGORIES) {
-    if (cat.id === 'sale') continue;
+    const zone = ZONES[ZONE_ORDER[cat.slot]];
+    const s = SIGNS[ZONE_ORDER[cat.slot]];
+    if (!zone || !s) {
+      console.warn(`[shop] no wall slot ${cat.slot} in this room - skipping ${cat.id}`);
+      continue;
+    }
     const items = productsInCategory(cat.id);
-    const zone = ZONES[cat.id];
     items.forEach((p, i) => {
       const [x, z] = zone.slots[i % zone.slots.length];
       addPedestal(p, new THREE.Vector3(x, 0, z), zone.rotY, scene, cat.accent);
     });
-    const s = SIGNS[cat.id];
     addSign(cat.name.toUpperCase(), cat.accent, s.pos, s.rotY, cat.id);
 
     const mid = zone.slots[Math.floor(zone.slots.length / 2)];
     zoneSpot(mid[0], mid[1], new THREE.Color(cat.accent));
   }
 
-  /* --- SALE: rotating center island --- */
-  const sale = CATEGORIES.find((c) => c.id === 'sale');
+  /* --- highlight island (Sale / Popular / whatever the admin named it) --- */
+  const sale = HIGHLIGHT ?? { title: '', accent: '#ff2d55', products: [] };
   const island = new THREE.Group();
   scene.add(island);
 
@@ -587,7 +602,7 @@ export function buildShop(scene, camera) {
   island.add(islandRing);
   pulsing.push({ material: islandRing.material, base: 0.8, amp: 0.2, speed: 1.5, phase: 1 });
 
-  const saleItems = productsInCategory('sale');
+  const saleItems = sale.products;
   saleItems.forEach((p, i) => {
     const a = (i / saleItems.length) * Math.PI * 2 + Math.PI / 2;
     addPedestal(
@@ -602,7 +617,7 @@ export function buildShop(scene, camera) {
   const saleSign = new THREE.Mesh(
     new THREE.PlaneGeometry(5, 1.6),
     new THREE.MeshBasicMaterial({
-      map: buildSignTexture('SALE %', sale.accent),
+      map: buildSignTexture(sale.title || 'FEATURED', sale.accent),
       transparent: true, toneMapped: false,
     })
   );

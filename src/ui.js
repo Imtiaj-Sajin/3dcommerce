@@ -1,7 +1,7 @@
 // HTML overlay: product detail modal, sizes, cart drawer, toasts and the
 // bottom brand navigation. Product photos come from public/products/.
 
-import { getProduct, imgURL } from './products.js';
+import { getProduct, imgURL, sizesFor } from './products.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -101,7 +101,7 @@ export class UI {
   _renderSizes() {
     const wrap = $('#modal-sizes');
     wrap.innerHTML = '';
-    this.current.sizes.forEach((s) => {
+    sizesFor(this.current).forEach((s) => {
       const b = document.createElement('button');
       b.textContent = s;
       b.addEventListener('click', () => {
