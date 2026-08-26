@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildShop, VIEWPOINTS } from './shop.js';
+import { TENANTS } from './concourse.js';
 import { loadCharacterGLBs, createRig } from './rig.js';
 import { Player } from './player.js';
 import { spawnVisitors } from './visitors.js';
@@ -64,6 +65,10 @@ const interactions = new Interactions(camera, canvas, shop.interactables, {
     goTo(zone);
   },
   onFloor: (point) => player?.setDestination(point),
+  onTenant: (id) => {
+    const t = TENANTS.find((x) => x.id === id);
+    ui.toast(`${t ? t.name : 'This store'} — leasing now, opening soon on METAMART 🏗️`);
+  },
 });
 interactions.setClickGuard(() => chaseCam.wasClick() && !ui.modalOpen);
 
@@ -74,6 +79,11 @@ loadCharacterGLBs(['Knight', 'Barbarian', 'Rogue'])
     player = new Player(createRig(gltfs[2]), scene); // you play the Rogue
     visitors = spawnVisitors(gltfs, scene, shop.browsePoints, shop.colliders, 8);
     document.getElementById('loader').classList.add('fade');
+    // dev-only handle: lets the scene be driven from the console / a
+    // headless browser without shipping anything to production
+    if (import.meta.env.DEV) {
+      window.__solespace = { scene, camera, shop, ui, player, visitors, cam: chaseCam };
+    }
     setTimeout(
       () => ui.toast('Welcome to SoleSpace — WASD to walk, drag to orbit, click a sneaker 👟'),
       1600

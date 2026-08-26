@@ -1,4 +1,4 @@
-# SoleSpace 👟
+# Meta Mart
 
 A virtual sneaker shop you walk through in third person — built with
 Three.js + Vite.

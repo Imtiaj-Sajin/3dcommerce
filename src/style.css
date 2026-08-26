@@ -161,6 +161,14 @@ html, body {
 #zone-nav button.active { background: var(--accent); color: #001318; }
 #zone-nav button.sale-btn { color: #ff5d7c; }
 #zone-nav button.sale-btn.active { background: #ff2d55; color: #fff; }
+#zone-nav .nav-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 5px 4px;
+  background: var(--line);
+}
+#zone-nav button.exit-btn { color: #7ee0ff; }
+#zone-nav button.exit-btn.active { background: #00e5ff; color: #00202a; }
 
 /* ---------- Modal ---------- */
 #modal {

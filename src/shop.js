@@ -1,7 +1,10 @@
-// The exhibition hall — an L-shaped premium showroom.
+// The exhibition hall — an L-shaped premium showroom that opens onto the
+// shared METAMART concourse through its south storefront.
 //
 //   MAIN HALL  x:[-23,23] z:[-15,15]   Nike / Jordan / adidas + SALE island
 //   WING       x:[3,23]   z:[15,50]    New Balance / ASICS / Converse
+//   VESTIBULE  x:[-16.5,-3.5] z:[15,21.1]   the threshold (see concourse.js)
+//   PLAZA      circle (-10,30) r 11        the concourse, nine other tenants
 //
 // Performance notes: all static trim (window frames, beams, fixtures,
 // panes, floor markings) is merged into a handful of draw calls; big matte
@@ -13,40 +16,160 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CATEGORIES, productsInCategory } from './products.js';
 import { buildCardTexture, buildSignTexture } from './sneakerArt.js';
 import { brickTexture, concreteTexture, floorTextures, shaftGradientTexture } from './textures.js';
+import {
+  buildConcourse, PLAZA, GATE_HW, GATE_Z, GATE_CEIL, STORE_Z, DOOR_HW, BAY_H,
+} from './concourse.js';
 
 export const HALL = { h: 8 };
 
-export const RECTS = [
-  { x0: -23, x1: 23, z0: -15, z1: 15 }, // main hall
-  { x0: 3, x1: 23, z0: 15, z1: 50 },    // wing
+/* ---------------- the walkable plan ----------------
+ * The floor you can stand on is a union of simple regions.  Each region
+ * insets its CLOSED edges by the caller's wall margin and pushes its OPEN
+ * edges — the doorways — well past the boundary, so neighbouring regions
+ * always overlap and no threshold is ever a dead band you stick in. */
+
+const SLOP = 4;
+
+export const REGIONS = [
+  { id: 'hall', kind: 'rect', x0: -23, x1: 23, z0: -15, z1: 15 },
+  { id: 'wing', kind: 'rect', x0: 3, x1: 23, z0: 15, z1: 50, open: { z0: 1 } },
+  {
+    id: 'door', kind: 'rect', open: { z0: 1, z1: 1 },
+    x0: PLAZA.x - DOOR_HW, x1: PLAZA.x + DOOR_HW, z0: STORE_Z, z1: STORE_Z + 2.5,
+  },
+  {
+    id: 'gate', kind: 'rect', open: { z1: 1 },
+    x0: PLAZA.x - GATE_HW, x1: PLAZA.x + GATE_HW, z0: STORE_Z, z1: GATE_Z,
+  },
+  { id: 'plaza', kind: 'circle', cx: PLAZA.x, cz: PLAZA.z, r: PLAZA.r },
 ];
+
+function nearestIn(region, x, z, m) {
+  if (region.kind === 'circle') {
+    const rad = region.r - m;
+    const dx = x - region.cx;
+    const dz = z - region.cz;
+    const d = Math.hypot(dx, dz);
+    if (d <= rad || d < 1e-6) return { x, z, inside: true };
+    return { x: region.cx + (dx / d) * rad, z: region.cz + (dz / d) * rad, inside: false };
+  }
+  const o = region.open ?? {};
+  const x0 = o.x0 ? region.x0 - SLOP : region.x0 + m;
+  const x1 = o.x1 ? region.x1 + SLOP : region.x1 - m;
+  const z0 = o.z0 ? region.z0 - SLOP : region.z0 + m;
+  const z1 = o.z1 ? region.z1 + SLOP : region.z1 - m;
+  if (x0 > x1 || z0 > z1) return null; // margin swallowed a narrow region
+  const cx = THREE.MathUtils.clamp(x, x0, x1);
+  const cz = THREE.MathUtils.clamp(z, z0, z1);
+  return { x: cx, z: cz, inside: cx === x && cz === z };
+}
+
+/** Slide a point to the nearest spot inside the plan, keeping `m` off walls. */
+export function clampToHall(x, z, m = 1.6) {
+  let best = null;
+  let bestD = Infinity;
+  for (const region of REGIONS) {
+    const p = nearestIn(region, x, z, m);
+    if (!p) continue;
+    if (p.inside) return { x, z };
+    const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best ? { x: best.x, z: best.z } : { x, z };
+}
+
+/** Which room a point is standing in — drives routing and camera headroom. */
+export function regionAt(x, z) {
+  for (const r of REGIONS) {
+    if (r.kind === 'circle') {
+      if (Math.hypot(x - r.cx, z - r.cz) <= r.r) return r.id;
+    } else if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) {
+      return r.id;
+    }
+  }
+  return 'hall';
+}
+
+/** How high the chase camera may rise here. The threshold is deliberately
+ *  low, and the drum is tall — the camera has to respect both. */
+export function cameraCeiling(x, z) {
+  const id = regionAt(x, z);
+  if (id === 'gate' || id === 'door') return GATE_CEIL - 0.6;
+  if (id === 'plaza') return 9.5;
+  return 7.5;
+}
+
+/* ---------------- routing ----------------
+ * The plan is a chain of rooms: wing — hall — gate — plaza.  A route is
+ * just the portals between the two ends, walked in order. */
 
 export const JUNCTION = new THREE.Vector3(13, 0, 13);
 
-export function regionOf(z) {
-  return z <= 15 ? 0 : 1;
-}
+const CHAIN = ['wing', 'hall', 'gate', 'plaza'];
+const HUB = { wing: 'wing', hall: 'hall', door: 'gate', gate: 'gate', plaza: 'plaza' };
+const PORTALS = [
+  [JUNCTION],                                                       // wing | hall
+  [new THREE.Vector3(PLAZA.x, 0, 13.2), new THREE.Vector3(PLAZA.x, 0, 17.8)], // hall | gate
+  [new THREE.Vector3(PLAZA.x, 0, GATE_Z + 1.6)],                    // gate | plaza
+];
 
-/** Clamp a point into the L-shaped floor plan (with wall margin).
- *  Clamps against the actual wall segments so the junction between the
- *  two halls stays completely open — no dead zone at the seam. */
-export function clampToHall(x, z, m = 1.6) {
-  x = THREE.MathUtils.clamp(x, -23 + m, 23 - m);
-  z = THREE.MathUtils.clamp(z, -15 + m, 50 - m);
-  // the notch outside the L (south-west of the wing opening)
-  if (z > 15 - m && x < 3 + m) {
-    const pushNorth = z - (15 - m);
-    const pushEast = (3 + m) - x;
-    if (pushNorth <= pushEast) z = 15 - m;
-    else x = 3 + m;
-  }
-  return { x, z };
-}
-
-/** Waypoint route between two floor points, going through the L junction. */
+/** Waypoint route between two floor points, threaded through the doorways. */
 export function routeTo(from, to) {
-  if (regionOf(from.z) === regionOf(to.z)) return [to.clone()];
-  return [JUNCTION.clone(), to.clone()];
+  let a = CHAIN.indexOf(HUB[regionAt(from.x, from.z)]);
+  let b = CHAIN.indexOf(HUB[regionAt(to.x, to.z)]);
+  if (a < 0) a = 1;
+  if (b < 0) b = 1;
+  const path = [];
+  if (a < b) {
+    for (let i = a; i < b; i++) for (const w of PORTALS[i]) path.push(w.clone());
+  } else {
+    for (let i = a - 1; i >= b; i--) {
+      for (const w of [...PORTALS[i]].reverse()) path.push(w.clone());
+    }
+  }
+  path.push(to.clone());
+  return path;
+}
+
+/* ---------------- where the crowd wanders ---------------- */
+
+export const WANDER_AREAS = [
+  { kind: 'rect', x0: -23, x1: 23, z0: -15, z1: 15, weight: 4 },
+  { kind: 'rect', x0: 3, x1: 23, z0: 15, z1: 50, weight: 3 },
+  { kind: 'circle', cx: PLAZA.x, cz: PLAZA.z, r: PLAZA.r, weight: 2 },
+];
+
+const WANDER_TOTAL = WANDER_AREAS.reduce((sum, a) => sum + a.weight, 0);
+
+/** Clear of the two centrepieces — the SALE island and the directory pylon. */
+export function isClearSpot(x, z) {
+  if (Math.hypot(x, z) < 5.5) return false;
+  if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 4.2) return false;
+  return true;
+}
+
+/** A random standable point somewhere in the mart. */
+export function randomSpot(inset = 3, out = new THREE.Vector3()) {
+  for (let tries = 0; tries < 30; tries++) {
+    let pick = Math.random() * WANDER_TOTAL;
+    const area = WANDER_AREAS.find((a) => (pick -= a.weight) <= 0) ?? WANDER_AREAS[0];
+    if (area.kind === 'circle') {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = Math.sqrt(Math.random()) * (area.r - inset);
+      out.set(area.cx + Math.cos(ang) * rad, 0, area.cz + Math.sin(ang) * rad);
+    } else {
+      out.set(
+        area.x0 + inset + Math.random() * (area.x1 - area.x0 - inset * 2),
+        0,
+        area.z0 + inset + Math.random() * (area.z1 - area.z0 - inset * 2)
+      );
+    }
+    if (isClearSpot(out.x, out.z)) return out;
+  }
+  return out;
 }
 
 const CARD_W = 1.4;
@@ -82,6 +205,7 @@ export const VIEWPOINTS = {
   asics:      { pos: new THREE.Vector3(15, 0, 31),     look: new THREE.Vector3(21, 0, 31) },
   converse:   { pos: new THREE.Vector3(13, 0, 41),     look: new THREE.Vector3(13, 0, 48) },
   sale:       { pos: new THREE.Vector3(0, 0, 7.4),     look: new THREE.Vector3(0, 0, 0) },
+  concourse:  { pos: new THREE.Vector3(PLAZA.x, 0, 24.5), look: new THREE.Vector3(PLAZA.x, 0, 31) },
 };
 
 /* ---------------- main builder ---------------- */
@@ -113,10 +237,10 @@ export function buildShop(scene, camera) {
   const floorTex = floorTextures();
   const TILE = 4.6; // world units per texture repeat (the sheet holds 2x2 tiles)
 
-  function tileFloor(w, d, x, z) {
-    // UVs are driven off WORLD position, not off the slab's own corner, so
-    // both slabs sample one shared grid and the grout keeps running straight
-    // through the seam where the main hall opens into the wing.
+  // UVs are driven off WORLD position, not off the slab's own corner, so
+  // every slab — rectangular hall, threshold, or round plaza — samples one
+  // shared grid and the grout runs straight through every seam.
+  function floorMaterial(w, d, x, z) {
     const worldUV = (t) => {
       t.repeat.set(w / TILE, d / TILE);
       t.offset.set((x - w / 2) / TILE, -(z + d / 2) / TILE);
@@ -125,14 +249,17 @@ export function buildShop(scene, camera) {
     worldUV(map);
     const roughnessMap = floorTex.roughnessMap.clone();
     worldUV(roughnessMap);
-    const mat = new THREE.MeshStandardMaterial({
+    return new THREE.MeshStandardMaterial({
       map,
       roughnessMap,
       roughness: 1, // the map carries the value (~0.35 base)
       metalness: 0.16,
       envMapIntensity: 1.15,
     });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+  }
+
+  function tileFloor(w, d, x, z) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMaterial(w, d, x, z));
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
     m.receiveShadow = true;
@@ -170,11 +297,14 @@ export function buildShop(scene, camera) {
   const brickTex = brickTexture();
   const concTex = concreteTexture();
 
-  function wall(kind, w, pos, rotY) {
+  function wall(kind, w, pos, rotY, h = HALL.h) {
     const src = kind === 'brick' ? brickTex : concTex;
     const mat = new THREE.MeshLambertMaterial({ map: src.clone() });
-    mat.map.repeat.set(kind === 'brick' ? w / 4.4 : w / 6, kind === 'brick' ? 2.8 : 1.4);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, HALL.h), mat);
+    mat.map.repeat.set(
+      kind === 'brick' ? w / 4.4 : w / 6,
+      (kind === 'brick' ? 2.8 : 1.4) * (h / HALL.h)
+    );
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     m.position.set(...pos);
     m.rotation.y = rotY;
     m.receiveShadow = true;
@@ -183,14 +313,22 @@ export function buildShop(scene, camera) {
   wall('brick', 46, [0, 4, -15], 0);                    // north
   wall('conc', 30, [-23, 4, 0], Math.PI / 2);           // west (main)
   wall('conc', 65, [23, 4, 17.5], -Math.PI / 2);        // east (full length)
-  wall('brick', 26, [-10, 4, 15], Math.PI);             // south (main, beside wing opening)
+  // South wall — split around the SoleSpace storefront. Two matching brick
+  // piers, then a 12.93-wide glazed bay with the sign band over it: the
+  // wall reads 6.53 | 12.93 | 6.53 across its 26.
+  const pierW = PLAZA.x - GATE_HW + 23;
+  wall('brick', pierW, [-23 + pierW / 2, 4, STORE_Z], Math.PI);
+  wall('brick', pierW, [3 - pierW / 2, 4, STORE_Z], Math.PI);
+  wall('brick', GATE_HW * 2, [PLAZA.x, (HALL.h + BAY_H) / 2, STORE_Z], Math.PI, HALL.h - BAY_H);
   wall('conc', 35, [3, 4, 32.5], Math.PI / 2);          // wing west
   wall('brick', 20, [13, 4, 50], Math.PI);              // wing south
 
   /* --- ceilings, beams, fluorescent fixtures --- */
   const ceilTex = concreteTexture([52, 54, 58]);
   function ceilingPlane(w, d, x, z) {
-    const mat = new THREE.MeshLambertMaterial({ map: ceilTex.clone() });
+    // a touch of emissive so the soffit reads as dark concrete rather than a
+    // void — nothing in the hall throws light upward
+    const mat = new THREE.MeshLambertMaterial({ map: ceilTex.clone(), emissive: 0x15161a });
     mat.map.repeat.set(w / 6, d / 6);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
     m.rotation.x = Math.PI / 2;
@@ -356,7 +494,8 @@ export function buildShop(scene, camera) {
     pulsing.push({ material: sign.material, base: 0.88, amp: 0.12, speed: 1.8, phase: Math.random() * 6 });
   }
 
-  addSign('SOLESPACE', '#00e5ff', [-10, 5.6, 14.9], Math.PI, null);
+  // dead centre of the sign band over the storefront
+  addSign('SOLESPACE', '#00e5ff', [PLAZA.x, (HALL.h + BAY_H) / 2, STORE_Z - 0.1], Math.PI, null);
 
   /* --- pedestal + card factory --- */
   function addPedestal(product, slotPos, rotY, parent, accent) {
@@ -475,15 +614,30 @@ export function buildShop(scene, camera) {
 
   zoneSpot(0, 0, new THREE.Color(sale.accent));
 
+  /* --- the way out: threshold + the shared concourse --- */
+  const concourse = buildConcourse(scene, {
+    floorMaterial, concTex, shaftTex, interactables, colliders, pulsing,
+  });
+
   /* --- dust motes --- */
   const P_COUNT = 320;
   const pGeo = new THREE.BufferGeometry();
   const pPos = new Float32Array(P_COUNT * 3);
   for (let i = 0; i < P_COUNT; i++) {
-    const inWing = i % 3 === 2;
-    pPos[i * 3] = inWing ? 3 + Math.random() * 20 : (Math.random() - 0.5) * 44;
+    const zone = i % 5; // 0-2 main hall · 3 wing · 4 concourse
     pPos[i * 3 + 1] = Math.random() * (HALL.h - 1) + 0.4;
-    pPos[i * 3 + 2] = inWing ? 15 + Math.random() * 34 : (Math.random() - 0.5) * 28;
+    if (zone === 4) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * (PLAZA.r - 1);
+      pPos[i * 3] = PLAZA.x + Math.cos(a) * r;
+      pPos[i * 3 + 2] = PLAZA.z + Math.sin(a) * r;
+    } else if (zone === 3) {
+      pPos[i * 3] = 3 + Math.random() * 20;
+      pPos[i * 3 + 2] = 15 + Math.random() * 34;
+    } else {
+      pPos[i * 3] = (Math.random() - 0.5) * 44;
+      pPos[i * 3 + 2] = (Math.random() - 0.5) * 28;
+    }
   }
   pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
   const particles = new THREE.Points(
@@ -505,6 +659,7 @@ export function buildShop(scene, camera) {
       p.material.opacity = p.base + Math.sin(t * p.speed + p.phase) * p.amp * 0.5;
     }
     island.rotation.y = t * 0.14;
+    concourse.update(t, dt);
     saleSign.lookAt(camera.position.x, saleSign.position.y, camera.position.z);
 
     const arr = pGeo.attributes.position.array;

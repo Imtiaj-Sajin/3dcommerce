@@ -1,9 +1,8 @@
 // NPC visitors — KayKit characters that wander both halls of the L,
 // stop to browse sneakers, and carry floating name tags.
 
-import * as THREE from 'three';
 import { damp, angleLerp, nameTagSprite, createRig, resolveCollisions } from './rig.js';
-import { RECTS, regionOf, routeTo, clampToHall } from './shop.js';
+import { randomSpot, routeTo, clampToHall } from './shop.js';
 
 const NAMES = ['SoleHunter', 'Kicks4Life', 'Mimi', 'AirWalker_7', 'RetroRae', 'HypeKnight', 'LaceLord', 'Jinx', 'DripDoc'];
 
@@ -23,17 +22,8 @@ class Visitor {
     this.path = [];
     this.lookAtPoint = null;
 
-    // spawn in either hall, clear of the island and pedestals
-    const r = RECTS[seed % 3 === 2 ? 1 : 0];
-    const p = new THREE.Vector3();
-    do {
-      p.set(
-        r.x0 + 2.5 + Math.random() * (r.x1 - r.x0 - 5),
-        0,
-        r.z0 + 2.5 + Math.random() * (r.z1 - r.z0 - 5)
-      );
-    } while (Math.hypot(p.x, p.z) < 5.5);
-    this.root.position.copy(p);
+    // spawn anywhere in the mart — both halls and the concourse
+    this.root.position.copy(randomSpot(2.6));
     this.root.rotation.y = this.heading;
 
     this.play('Idle', 0);
@@ -56,15 +46,7 @@ class Visitor {
       this.lookAtPoint = bp.look;
     } else {
       this.lookAtPoint = null;
-      const r = RECTS[Math.random() < 0.55 ? 0 : 1];
-      target = new THREE.Vector3();
-      do {
-        target.set(
-          r.x0 + 3 + Math.random() * (r.x1 - r.x0 - 6),
-          0,
-          r.z0 + 3 + Math.random() * (r.z1 - r.z0 - 6)
-        );
-      } while (Math.hypot(target.x, target.z) < 5.5 && regionOf(target.z) === 0);
+      target = randomSpot(3);
     }
     this.path = routeTo(this.root.position, target);
   }

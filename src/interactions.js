@@ -4,13 +4,14 @@
 import * as THREE from 'three';
 
 export class Interactions {
-  constructor(camera, dom, interactables, { onProduct, onSign, onFloor }) {
+  constructor(camera, dom, interactables, { onProduct, onSign, onFloor, onTenant }) {
     this.camera = camera;
     this.dom = dom;
     this.interactables = interactables;
     this.onProduct = onProduct;
     this.onSign = onSign;
     this.onFloor = onFloor;
+    this.onTenant = onTenant;
 
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
@@ -47,6 +48,7 @@ export class Interactions {
     const ud = hit.object.userData;
     if (ud.type === 'product') this.onProduct(ud.productId);
     else if (ud.type === 'sign') this.onSign(ud.zone);
+    else if (ud.type === 'tenant') this.onTenant?.(ud.tenantId);
     else if (ud.type === 'floor') this.onFloor(hit.point);
   }
 
@@ -64,7 +66,9 @@ export class Interactions {
       this.hovered = newHover;
     }
     this.dom.style.cursor =
-      ud?.type === 'product' || ud?.type === 'sign' ? 'pointer' : 'grab';
+      ud?.type === 'product' || ud?.type === 'sign' || ud?.type === 'tenant'
+        ? 'pointer'
+        : 'grab';
 
     // ease card scales toward targets
     const k = 1 - Math.exp(-dt * 10);

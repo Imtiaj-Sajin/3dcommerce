@@ -3,9 +3,9 @@
 
 import * as THREE from 'three';
 import { damp, angleLerp } from './rig.js';
-import { clampToHall } from './shop.js';
+import { cameraCeiling, clampToHall } from './shop.js';
 
-const PITCH_MIN = -0.1;
+const PITCH_MIN = -0.5; // enough to look up into the concourse dome
 const PITCH_MAX = 1.15;
 const DIST_MIN = 2.6;
 const DIST_MAX = 9;
@@ -23,6 +23,7 @@ export class ThirdPersonCamera {
     this.targetDist = 4.8;
 
     this.focus = new THREE.Vector3(0, 1.5, 12.2);
+    this.ceil = 7.5; // headroom, eased so thresholds don't snap the camera
 
     this.dragging = false;
     this.moved = 0;
@@ -99,7 +100,11 @@ export class ThirdPersonCamera {
     // smoothed focus point just above the player's shoulders
     this.focus.x += (playerPos.x - this.focus.x) * damp(8, dt);
     this.focus.z += (playerPos.z - this.focus.z) * damp(8, dt);
-    this.focus.y += (playerPos.y + 1.5 - this.focus.y) * damp(8, dt);
+    // When you tilt up, raise the aim point above the player's head. Without
+    // this the camera just sinks to the floor clamp and the tilt goes nowhere,
+    // so ceilings — beams, light shafts, the concourse dome — are unreachable.
+    const lift = Math.max(0, -this.pitch) * 8;
+    this.focus.y += (playerPos.y + 1.5 + lift - this.focus.y) * damp(8, dt);
 
     const cp = Math.cos(this.pitch);
     const pos = new THREE.Vector3(
@@ -108,11 +113,13 @@ export class ThirdPersonCamera {
       this.focus.z + Math.cos(this.yaw) * cp * this.dist
     );
 
-    // keep the camera inside the hall so it doesn't fly through outer walls
+    // keep the camera inside the plan so it doesn't fly through outer walls
     const c = clampToHall(pos.x, pos.z, 0.5);
     pos.x = c.x;
     pos.z = c.z;
-    pos.y = THREE.MathUtils.clamp(pos.y, 0.5, 7.5);
+    // headroom follows the room: 5.2 threshold, 8 halls, 12 drum
+    this.ceil += (cameraCeiling(pos.x, pos.z) - this.ceil) * damp(6, dt);
+    pos.y = THREE.MathUtils.clamp(pos.y, 0.5, this.ceil);
 
     this.camera.position.copy(pos);
     this.camera.lookAt(this.focus);
