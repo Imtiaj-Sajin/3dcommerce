@@ -1,7 +1,7 @@
 // The exhibition hall — an L-shaped premium showroom.
 //
 //   MAIN HALL  x:[-23,23] z:[-15,15]   Nike / Jordan / adidas + SALE island
-//   WING       x:[3,23]   z:[15,40]    New Balance / ASICS / Converse
+//   WING       x:[3,23]   z:[15,50]    New Balance / ASICS / Converse
 //
 // Performance notes: all static trim (window frames, beams, fixtures,
 // panes, floor markings) is merged into a handful of draw calls; big matte
@@ -18,7 +18,7 @@ export const HALL = { h: 8 };
 
 export const RECTS = [
   { x0: -23, x1: 23, z0: -15, z1: 15 }, // main hall
-  { x0: 3, x1: 23, z0: 15, z1: 40 },    // wing
+  { x0: 3, x1: 23, z0: 15, z1: 50 },    // wing
 ];
 
 export const JUNCTION = new THREE.Vector3(13, 0, 13);
@@ -32,7 +32,7 @@ export function regionOf(z) {
  *  two halls stays completely open — no dead zone at the seam. */
 export function clampToHall(x, z, m = 1.6) {
   x = THREE.MathUtils.clamp(x, -23 + m, 23 - m);
-  z = THREE.MathUtils.clamp(z, -15 + m, 40 - m);
+  z = THREE.MathUtils.clamp(z, -15 + m, 50 - m);
   // the notch outside the L (south-west of the wing opening)
   if (z > 15 - m && x < 3 + m) {
     const pushNorth = z - (15 - m);
@@ -59,18 +59,18 @@ const ZONES = {
   nike:       { slots: [[-19.5, -8.25], [-19.5, -2.75], [-19.5, 2.75], [-19.5, 8.25]], rotY: Math.PI / 2 },
   jordan:     { slots: [[-6, -11.5], [0, -11.5], [6, -11.5]], rotY: 0 },
   adidas:     { slots: [[19.5, 8.25], [19.5, 2.75], [19.5, -2.75], [19.5, -8.25]], rotY: -Math.PI / 2 },
-  newbalance: { slots: [[6.5, 21], [6.5, 27.5], [6.5, 34]], rotY: Math.PI / 2 },
-  asics:      { slots: [[19.5, 19], [19.5, 24.5], [19.5, 30], [19.5, 35.5]], rotY: -Math.PI / 2 },
-  converse:   { slots: [[8, 36.5], [13, 36.5], [18, 36.5]], rotY: Math.PI },
+  newbalance: { slots: [[6.5, 22], [6.5, 31], [6.5, 40]], rotY: Math.PI / 2 },
+  asics:      { slots: [[19.5, 20], [19.5, 27.5], [19.5, 35], [19.5, 42.5]], rotY: -Math.PI / 2 },
+  converse:   { slots: [[8, 46.5], [13, 46.5], [18, 46.5]], rotY: Math.PI },
 };
 
 const SIGNS = {
   nike:       { pos: [-22.88, 5.2, 0], rotY: Math.PI / 2 },
   jordan:     { pos: [0, 5.2, -14.88], rotY: 0 },
   adidas:     { pos: [22.88, 5.2, 0], rotY: -Math.PI / 2 },
-  newbalance: { pos: [3.12, 5.2, 27.5], rotY: Math.PI / 2 },
-  asics:      { pos: [22.88, 5.2, 27.5], rotY: -Math.PI / 2 },
-  converse:   { pos: [13, 5.2, 39.88], rotY: Math.PI },
+  newbalance: { pos: [3.12, 5.2, 31], rotY: Math.PI / 2 },
+  asics:      { pos: [22.88, 5.2, 31], rotY: -Math.PI / 2 },
+  converse:   { pos: [13, 5.2, 49.88], rotY: Math.PI },
 };
 
 export const VIEWPOINTS = {
@@ -78,9 +78,9 @@ export const VIEWPOINTS = {
   nike:       { pos: new THREE.Vector3(-14, 0, 0),     look: new THREE.Vector3(-20, 0, 0) },
   jordan:     { pos: new THREE.Vector3(0, 0, -6),      look: new THREE.Vector3(0, 0, -12) },
   adidas:     { pos: new THREE.Vector3(14, 0, 0),      look: new THREE.Vector3(20, 0, 0) },
-  newbalance: { pos: new THREE.Vector3(11, 0, 27.5),   look: new THREE.Vector3(5, 0, 27.5) },
-  asics:      { pos: new THREE.Vector3(15, 0, 27.5),   look: new THREE.Vector3(21, 0, 27.5) },
-  converse:   { pos: new THREE.Vector3(13, 0, 31),     look: new THREE.Vector3(13, 0, 38) },
+  newbalance: { pos: new THREE.Vector3(11, 0, 31),     look: new THREE.Vector3(5, 0, 31) },
+  asics:      { pos: new THREE.Vector3(15, 0, 31),     look: new THREE.Vector3(21, 0, 31) },
+  converse:   { pos: new THREE.Vector3(13, 0, 41),     look: new THREE.Vector3(13, 0, 48) },
   sale:       { pos: new THREE.Vector3(0, 0, 7.4),     look: new THREE.Vector3(0, 0, 0) },
 };
 
@@ -132,7 +132,7 @@ export function buildShop(scene, camera) {
     interactables.push(m);
   }
   tileFloor(46, 30, 0, 0);
-  tileFloor(20, 25, 13, 27.5);
+  tileFloor(20, 35, 13, 32.5);
 
   // yellow showroom guide markings (merged)
   for (const [w, d, x, z] of [
@@ -140,8 +140,8 @@ export function buildShop(scene, camera) {
     [26, 0.09, -10, 11.6],
     [0.09, 21.8, -17, 0.7],
     [0.09, 21.8, 17, 0.7],
-    [0.09, 20, 9.5, 25],
-    [0.09, 20, 16.5, 25],
+    [0.09, 30, 9.5, 30],
+    [0.09, 30, 16.5, 30],
   ]) {
     const g = new THREE.PlaneGeometry(w, d);
     g.rotateX(-Math.PI / 2);
@@ -165,10 +165,10 @@ export function buildShop(scene, camera) {
   }
   wall('brick', 46, [0, 4, -15], 0);                    // north
   wall('conc', 30, [-23, 4, 0], Math.PI / 2);           // west (main)
-  wall('conc', 55, [23, 4, 12.5], -Math.PI / 2);        // east (full length)
+  wall('conc', 65, [23, 4, 17.5], -Math.PI / 2);        // east (full length)
   wall('brick', 26, [-10, 4, 15], Math.PI);             // south (main, beside wing opening)
-  wall('conc', 25, [3, 4, 27.5], Math.PI / 2);          // wing west
-  wall('brick', 20, [13, 4, 40], Math.PI);              // wing south
+  wall('conc', 35, [3, 4, 32.5], Math.PI / 2);          // wing west
+  wall('brick', 20, [13, 4, 50], Math.PI);              // wing south
 
   /* --- ceilings, beams, fluorescent fixtures --- */
   const ceilTex = concreteTexture([52, 54, 58]);
@@ -181,7 +181,7 @@ export function buildShop(scene, camera) {
     scene.add(m);
   }
   ceilingPlane(46, 30, 0, 0);
-  ceilingPlane(20, 25, 13, 27.5);
+  ceilingPlane(20, 35, 13, 32.5);
 
   function beamRow(span, cx, cz, fixturesX, tubeArr) {
     box(metalGeos, span, 0.55, 0.38, cx, HALL.h - 0.28, cz);
@@ -191,7 +191,7 @@ export function buildShop(scene, camera) {
     }
   }
   for (const bz of [-12, -6, 0, 6, 12]) beamRow(46, 0, bz, [-12, 0, 12], tubeGeos);
-  for (const bz of [18, 24, 30, 36]) beamRow(20, 13, bz, [8, 18], tubeGeosWing);
+  for (const bz of [18, 24, 30, 36, 42, 48]) beamRow(20, 13, bz, [8, 18], tubeGeosWing);
 
   /* --- industrial windows --- */
   const shaftTex = shaftGradientTexture();
@@ -231,8 +231,8 @@ export function buildShop(scene, camera) {
   }
   addWindow(-10, -15, true);
   addWindow(10, -15, true);
-  addWindow(6.5, 40, false);
-  addWindow(19.5, 40, false);
+  addWindow(6.5, 50, false);
+  addWindow(19.5, 50, false);
 
   /* --- flush the merged static geometry (4 draw calls total) --- */
   const metalMesh = new THREE.Mesh(
@@ -285,13 +285,13 @@ export function buildShop(scene, camera) {
   // violet wash over the wing (matches ASICS/NB signage), cool cyan near
   // the entrance, warm amber over the wing's Converse corner
   const wingGlow = new THREE.PointLight(0xb47aff, 60, 28, 1.8);
-  wingGlow.position.set(13, 5.6, 24);
+  wingGlow.position.set(13, 5.6, 28);
   scene.add(wingGlow);
   const entranceGlow = new THREE.PointLight(0x58d4ff, 38, 20, 1.8);
   entranceGlow.position.set(-4, 5.2, 11);
   scene.add(entranceGlow);
   const converseGlow = new THREE.PointLight(0xffb86b, 42, 20, 1.8);
-  converseGlow.position.set(13, 5, 36);
+  converseGlow.position.set(13, 5, 46);
   scene.add(converseGlow);
 
   function zoneSpot(x, z, color) {
@@ -466,7 +466,7 @@ export function buildShop(scene, camera) {
     const inWing = i % 3 === 2;
     pPos[i * 3] = inWing ? 3 + Math.random() * 20 : (Math.random() - 0.5) * 44;
     pPos[i * 3 + 1] = Math.random() * (HALL.h - 1) + 0.4;
-    pPos[i * 3 + 2] = inWing ? 15 + Math.random() * 24 : (Math.random() - 0.5) * 28;
+    pPos[i * 3 + 2] = inWing ? 15 + Math.random() * 34 : (Math.random() - 0.5) * 28;
   }
   pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
   const particles = new THREE.Points(
