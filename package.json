@@ -6,12 +6,29 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server/index.js",
+    "dev:all": "concurrently -n vite,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
+    "db:apply": "node scripts/db-apply.mjs sql/01_schema.sql sql/02_seed.sql",
+    "db:seed": "node scripts/gen-seed.mjs"
   },
   "dependencies": {
-    "three": "^0.172.0"
+    "@google/genai": "^2.19.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "mysql2": "^3.24.2",
+    "openai": "^7.5.0",
+    "sharp": "^0.35.4",
+    "three": "^0.172.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "vite": "^6.3.5"
   }
 }

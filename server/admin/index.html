@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>METAMART — Admin</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ---------------- login ---------------- -->
+<div id="login">
+  <form class="login-card" id="login-form">
+    <div class="logo">META<span>MART</span></div>
+    <div class="sub">ADMIN CONSOLE</div>
+    <div class="field">
+      <label for="li-email">Email</label>
+      <input id="li-email" type="email" autocomplete="username" value="admin@metamart.local" required />
+    </div>
+    <div class="field">
+      <label for="li-pw">Password</label>
+      <input id="li-pw" type="password" autocomplete="current-password" required />
+    </div>
+    <button type="submit" style="width:100%">Sign in</button>
+    <p class="small muted" style="margin-top:14px">First run? The seeded password is in <code>sql/02_seed.sql</code>. Change it under Settings.</p>
+  </form>
+</div>
+
+<!-- ---------------- app ---------------- -->
+<div id="app" class="hidden">
+  <aside>
+    <div class="logo">META<span>MART</span></div>
+    <button class="nav active" data-view="dashboard">Dashboard</button>
+    <button class="nav" data-view="products">Products</button>
+    <button class="nav" data-view="categories">Categories</button>
+    <button class="nav" data-view="highlight">Highlight island</button>
+    <button class="nav" data-view="discounts">Discounts</button>
+    <button class="nav" data-view="spaces">Spaces</button>
+    <button class="nav" data-view="ai">AI activity</button>
+    <button class="nav" data-view="settings">Settings</button>
+    <div class="spacer"></div>
+    <div class="who" id="who"></div>
+    <button class="ghost sm" id="logout">Sign out</button>
+  </aside>
+
+  <main>
+    <div class="head">
+      <h1 id="view-title">Dashboard</h1>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select id="space-select" style="width:auto"></select>
+        <a href="/" target="_blank"><button class="ghost sm" type="button">Open mall ↗</button></a>
+      </div>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="toast" class="hidden"></div>
+<div id="modal-root"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
