@@ -149,10 +149,12 @@ export function buildShop(scene, camera) {
   // 1.3 in front of it.  That makes every lane sit 6 off its wall and stay
   // symmetric about its hall's centre line (x=0 main, x=13 wing).
   // Nothing crosses the mouth of the wing — the return line stops on the
-  // New Balance lane and hands off, leaving the junction open.
+  // New Balance lane and hands off, leaving the junction open.  Every
+  // cross-line runs lane-to-lane and dead-ends on a lane; none of them
+  // overhangs past a corner out to a wall.
   for (const [w, d, x, z] of [
     [34, 0.09, 0, -10.2],      // Jordan end line       x -17..17
-    [32, 0.09, -7, 11.6],      // main return line      x -23..9
+    [26, 0.09, -4, 11.6],      // main return line      x -17..9
     [8, 0.09, 13, 45.2],       // Converse end line     x   9..17
     [0.09, 21.8, -17, 0.7],    // Nike lane             z -10.2..11.6
     [0.09, 55.4, 17, 17.5],    // adidas + ASICS lane   z -10.2..45.2
