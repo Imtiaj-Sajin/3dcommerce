@@ -287,19 +287,23 @@ export async function embed(text) {
   }
 }
 
-/**
- * Image generation (Gemini). Returns { dataUrl, mime } or null.
- * Used by the stylist agent for try-on previews.
- */
-export async function generateImage({ prompt, images = [], size = '1K' }) {
-  if (!process.env.GEMINI_API_KEY) return null;
+/* ------------------------------------------------------------------ */
+/*  image generation                                                   */
+/* ------------------------------------------------------------------ */
+
+const dataUrlParts = (s) => {
+  const m = /^data:([^;]+);base64,(.+)$/.exec(s || '');
+  return m ? { mime: m[1], b64: m[2] } : null;
+};
+
+async function geminiImage({ prompt, images, size }) {
   const model = process.env.GEMINI_IMAGE_MODEL || 'models/gemini-3.1-flash-lite-image';
   const modelPath = model.startsWith('models/') ? model.slice(7) : model;
 
   const parts = [{ text: prompt }];
   for (const img of images) {
-    const m = /^data:([^;]+);base64,(.+)$/.exec(img);
-    if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+    const p = dataUrlParts(img);
+    if (p) parts.push({ inline_data: { mime_type: p.mime, data: p.b64 } });
   }
 
   const json = await postJSON(
@@ -309,13 +313,87 @@ export async function generateImage({ prompt, images = [], size = '1K' }) {
       contents: [{ role: 'user', parts }],
       generationConfig: { responseModalities: ['IMAGE', 'TEXT'], imageConfig: { imageSize: size } },
     },
-    90000
+    120000
   );
 
   for (const p of json.candidates?.[0]?.content?.parts || []) {
     const data = p.inline_data?.data || p.inlineData?.data;
     const mime = p.inline_data?.mime_type || p.inlineData?.mimeType || 'image/png';
-    if (data) return { dataUrl: `data:${mime};base64,${data}`, mime, base64: data };
+    if (data) return { dataUrl: `data:${mime};base64,${data}`, mime, base64: data, provider: 'gemini' };
   }
-  return null;
+  throw new Error('gemini returned no image part');
+}
+
+async function openaiImage({ prompt, images }) {
+  const key = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+  let res;
+
+  if (images.length) {
+    // With reference images we use the edits endpoint so the generated look
+    // actually follows the product photo instead of being invented.
+    const fd = new FormData();
+    fd.append('model', model);
+    fd.append('prompt', prompt.slice(0, 4000));
+    fd.append('size', '1024x1536');
+    images.slice(0, 4).forEach((img, i) => {
+      const p = dataUrlParts(img);
+      if (!p) return;
+      const bytes = Buffer.from(p.b64, 'base64');
+      fd.append('image[]', new Blob([bytes], { type: p.mime }), `ref${i}.${p.mime.includes('png') ? 'png' : 'jpg'}`);
+    });
+    res = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: fd,
+      signal: AbortSignal.timeout(150000),
+    });
+  } else {
+    res = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, prompt: prompt.slice(0, 4000), n: 1, size: '1024x1536' }),
+      signal: AbortSignal.timeout(150000),
+    });
+  }
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
+  const b64 = json.data?.[0]?.b64_json;
+  if (!b64) throw new Error('openai returned no image');
+  return { dataUrl: `data:image/png;base64,${b64}`, mime: 'image/png', base64: b64, provider: 'openai' };
+}
+
+/**
+ * Image generation with the same fallback philosophy as text: try Gemini,
+ * then OpenAI. Returns { dataUrl, mime, base64, provider }.
+ * Throws with every provider's reason if none can produce an image.
+ */
+export async function generateImage({ prompt, images = [], size = '1K' }) {
+  const attempts = [];
+
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await geminiImage({ prompt, images, size });
+    } catch (e) {
+      attempts.push(`gemini: ${e.message}`);
+      console.warn('[ai] gemini image failed:', e.message);
+    }
+  }
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      return await openaiImage({ prompt, images });
+    } catch (e) {
+      attempts.push(`openai: ${e.message}`);
+      console.warn('[ai] openai image failed:', e.message);
+    }
+  }
+
+  const err = new Error(
+    attempts.length
+      ? `no image provider could render this: ${attempts.join(' | ')}`
+      : 'no image provider configured - set GEMINI_API_KEY or OPENAI_API_KEY'
+  );
+  err.status = 502;
+  throw err;
 }
