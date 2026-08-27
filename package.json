@@ -15,7 +15,6 @@
     "test:browser": "node scripts/browser-smoke.mjs",
     "test:shopper": "node scripts/shopper-smoke.mjs",
     "test:admin": "node scripts/admin-smoke.mjs",
-    "apparel:images": "node scripts/gen-apparel-images.mjs",
     "apparel:load": "node scripts/load-apparel.mjs",
     "sql:dump": "node scripts/db-dump.mjs"
   },
