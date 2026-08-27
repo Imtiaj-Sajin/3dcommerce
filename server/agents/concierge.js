@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { complete } from './providers.js';
 import { screenInput, asUntrusted, validateOutput } from './guardrails.js';
 import { planSearch, runFilters, plainSearch } from './search.js';
-import { describeImage } from './vision.js';
+import { searchByImage } from './vision.js';
 import { q, one } from '../lib/db.js';
 
 /* ------------------------------------------------------------------ */
@@ -139,30 +139,33 @@ export async function chat(input) {
   let products = [];
   let imageRead = null;
 
-  /* ---------------- 1. an image short-circuits the planner ---------------- */
+  /* ---------------- 1. an image short-circuits the planner ----------------
+   * Hand the photo to the vision agent wholesale rather than re-deriving
+   * filters here. It matches a legible brand against what the mall actually
+   * carries and widens in stages if the tight query finds nothing - logic
+   * that a second implementation only ever drifts away from. */
   if (input.imageDataUrl) {
-    const seen = await describeImage(input.imageDataUrl);
+    const seen = await searchByImage(input.imageDataUrl, null, 8);
     imageRead = seen.attrs;
     meta = seen.meta;
+    products = seen.results;
+    if (seen.note) flags.push('vision_low_confidence');
 
-    const filters = {
-      keywords: [imageRead.silhouette, imageRead.product_type, ...imageRead.style_keywords]
-        .filter(Boolean).slice(0, 6),
-      brands: [],
-      category_slugs: [],
-      colors: [imageRead.primary_color, ...imageRead.secondary_colors].filter(Boolean).slice(0, 3),
-      min_price_cents: null,
-      max_price_cents: null,
-      on_sale_only: false,
-      sort: 'relevance',
-    };
-    products = await runFilters(filters, null, 8);
-    if (!products.length) {
-      products = await runFilters(
-        { ...filters, keywords: [imageRead.product_type].filter(Boolean) },
-        null,
-        8
-      );
+    // A photo usually arrives with words attached ("like this but cheaper").
+    // Run those too, described in terms of what the photo showed, and append
+    // anything new - the visual match still leads.
+    if (screened.text.trim().length > 2) {
+      const look = [imageRead.primary_color, imageRead.silhouette || imageRead.product_type]
+        .filter(Boolean).join(' ');
+      try {
+        const planned = await planSearch(`${screened.text} (they showed a photo of ${look})`, null);
+        const extra = await runFilters(planned.filters, null, 8);
+        const have = new Set(products.map((p) => p.id));
+        products = [...products, ...extra.filter((p) => !have.has(p.id))].slice(0, 10);
+        flags.push('image_plus_text');
+      } catch {
+        flags.push('image_text_refine_failed');
+      }
     }
   }
 
