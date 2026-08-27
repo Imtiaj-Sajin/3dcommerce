@@ -1,7 +1,7 @@
 // HTML overlay: product detail modal, sizes, cart drawer, toasts and the
 // bottom brand navigation. Product photos come from public/products/.
 
-import { getProduct, imgURL, sizesFor } from './products.js';
+import { getProduct, imgURL, sizesFor, sizeSystemOf } from './products.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -86,6 +86,8 @@ export class UI {
     tag.classList.toggle('chip-sale', !!p.salePrice);
 
     $('#modal-img').src = imgURL(p);
+    const sysLabel = sizeSystemOf(p);
+    $('#modal-size-label').textContent = sysLabel ? `Size (${sysLabel})` : 'Size';
     this._renderSizes();
     this._renderVariants();
     this._setView('side');
@@ -142,14 +144,16 @@ export class UI {
       return;
     }
     const p = this.current;
+    const system = sizeSystemOf(p);
     this.cart.push({
       productId: p.id,
       name: p.name,
       price: p.salePrice ?? p.price,
       size: this.sizeChoice,
+      sizeSystem: system,
     });
     this._refreshCartBadge();
-    this.toast(`${p.name} (EU ${this.sizeChoice}) added to cart 🛒`);
+    this.toast(`${p.name} (${system ? system + ' ' : ''}${this.sizeChoice}) added to cart 🛒`);
     this.closeModal();
   }
 
@@ -181,7 +185,7 @@ export class UI {
       const info = document.createElement('div');
       info.className = 'cr-info';
       info.innerHTML = `<div class="cr-name">${item.name}</div>
-        <div class="cr-meta">${p.categoryName} · EU ${item.size}</div>`;
+        <div class="cr-meta">${p.categoryName} · ${item.sizeSystem ? item.sizeSystem + ' ' : ''}${item.size}</div>`;
       const price = document.createElement('div');
       price.className = 'cr-price';
       price.textContent = `$${item.price}`;

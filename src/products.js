@@ -90,3 +90,13 @@ export const productsInCategory = (catId) =>
 /** Sizes for the detail modal - falls back to a sensible EU run. */
 export const sizesFor = (product) =>
   product?.sizes?.length ? product.sizes.map((s) => s.label ?? s) : [40, 41, 42, 43, 44, 45];
+
+/**
+ * The size system worth SHOWING. Numeric systems are ambiguous - "42" needs
+ * to say EU - but S/M/L speaks for itself, so ALPHA and ONE_SIZE print
+ * nothing rather than leaking an internal enum name into the shop.
+ */
+export function sizeSystemOf(product) {
+  const s = product?.sizes?.[0]?.system;
+  return s === 'EU' || s === 'US' || s === 'UK' ? s : '';
+}

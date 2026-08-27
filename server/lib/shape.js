@@ -24,6 +24,7 @@ export function shapeProduct(p) {
     currency: p.currency ?? 'USD',
     slot: p.slot_index ?? 0,
     stock: p.stock ?? 0,
+    sizes: p.sizes ?? [],
   };
 }
 

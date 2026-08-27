@@ -60,6 +60,7 @@ try {
   throw err;
 }
 
+applySpaceBranding();
 buildZoneNav();
 
 const shop = buildShop(scene, camera);
@@ -73,6 +74,30 @@ function goTo(zone) {
   const vp = cat ? viewpointForSlot(cat.slot) : VIEWPOINTS[zone] ?? VIEWPOINTS.entrance;
   if (player) player.setDestination(vp.pos);
   chaseCam.faceDirection(vp.look.clone().sub(vp.pos));
+}
+
+/** Wear the current store's name and colour, not SoleSpace's. */
+function applySpaceBranding() {
+  document.title = `${SPACE.name} — METAMART`;
+
+  const brand = document.querySelector('.brand');
+  if (brand) {
+    // Split the name so the second half picks up the accent, the way the
+    // SOLE/SPACE lockup does.
+    const words = SPACE.name.trim().split(/\s+/);
+    const head = words.length > 1 ? words.slice(0, -1).join(' ') : SPACE.name.slice(0, Math.ceil(SPACE.name.length / 2));
+    const tail = words.length > 1 ? words[words.length - 1] : SPACE.name.slice(Math.ceil(SPACE.name.length / 2));
+    brand.innerHTML = words.length > 1 ? `${head} <span>${tail}</span>` : `${head}<span>${tail}</span>`;
+    brand.title = SPACE.tagline || SPACE.name;
+  }
+
+  document.documentElement.style.setProperty('--accent', SPACE.accent);
+
+  const hint = document.getElementById('controls-hint');
+  if (hint) {
+    hint.innerHTML =
+      '⌨ WASD walk · ⇧ run&nbsp;·&nbsp;🖱 drag orbit · wheel zoom&nbsp;·&nbsp;🛍 click a product';
+  }
 }
 
 /** The bottom nav is built from whatever categories this space actually has. */

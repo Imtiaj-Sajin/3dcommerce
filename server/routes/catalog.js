@@ -71,7 +71,26 @@ router.get('/spaces/:slug/bundle', async (req, res, next) => {
       activeDiscounts(),
     ]);
 
-    const priced = applyPricing(products, discounts);
+    // Sizes travel with the bundle so the product card can open instantly -
+    // and so a shirt offers S/M/L rather than falling back to shoe sizes.
+    const variants = await q(
+      `SELECT v.product_id, v.size_label, v.size_system, v.stock
+         FROM product_variants v
+         JOIN products p ON p.id = v.product_id
+        WHERE p.space_id = ? AND v.is_active = 1
+        ORDER BY v.product_id, v.sort_order`,
+      [space.id]
+    );
+    const sizesByProduct = new Map();
+    for (const v of variants) {
+      if (!sizesByProduct.has(v.product_id)) sizesByProduct.set(v.product_id, []);
+      sizesByProduct.get(v.product_id).push({ label: v.size_label, system: v.size_system, stock: v.stock });
+    }
+
+    const priced = applyPricing(products, discounts).map((p) => ({
+      ...p,
+      sizes: sizesByProduct.get(p.id) ?? [],
+    }));
 
     let highlightPayload = null;
     let wallProducts = priced;
