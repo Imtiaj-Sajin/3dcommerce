@@ -22,6 +22,15 @@
   <!-- Top header -->
   <header id="hud-top">
     <div class="brand">SOLE<span>SPACE</span></div>
+    <div class="hud-search">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search-input" type="search" placeholder="Ask for anything — “white classics under $110”" autocomplete="off" />
+      <button id="search-camera" title="Search by photo">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input id="search-file" type="file" accept="image/*" hidden />
+    </div>
+
     <div class="hud-right">
       <div class="hint-pill" id="controls-hint">⌨ WASD walk · ⇧ run&nbsp;·&nbsp;🖱 drag orbit · wheel zoom&nbsp;·&nbsp;👟 click a sneaker</div>
       <button id="cart-btn" title="Your cart">
@@ -44,6 +53,18 @@
     <span class="nav-sep"></span>
     <button data-zone="concourse" class="exit-btn">Concourse ⇱</button>
   </nav>
+
+  <!-- AI search results -->
+  <aside id="search-panel" class="hidden">
+    <div class="sp-head">
+      <div>
+        <h3 id="sp-title">Results</h3>
+        <p class="sp-note" id="sp-note"></p>
+      </div>
+      <button id="sp-close" title="Close">✕</button>
+    </div>
+    <div id="sp-results"></div>
+  </aside>
 
   <!-- Product detail modal -->
   <div id="modal" class="hidden">
@@ -70,6 +91,21 @@
           <div class="sizes" id="modal-sizes"></div>
         </div>
 
+        <div class="modal-section tryon">
+          <label>See it on you</label>
+          <div class="tryon-row">
+            <select id="tryon-size" title="Your build">
+              <option value="XS">XS</option><option value="S">S</option>
+              <option value="M" selected>M</option><option value="L">L</option>
+              <option value="XL">XL</option><option value="XXL">XXL</option>
+            </select>
+            <button id="tryon-btn" class="ghost-btn">✨ Generate preview</button>
+            <button id="tryon-face" class="ghost-btn" title="Use your own photo (never stored)">＋ Photo</button>
+            <input id="tryon-file" type="file" accept="image/*" hidden />
+          </div>
+          <p class="tryon-note" id="tryon-note"></p>
+        </div>
+
         <button id="add-to-cart">Add to cart</button>
       </div>
     </div>
@@ -85,6 +121,24 @@
     <div class="cart-foot">
       <div class="cart-total"><span>Total</span><strong id="cart-total">$0</strong></div>
       <button id="checkout-btn">Checkout</button>
+    </div>
+  </div>
+
+  <!-- Try-on preview -->
+  <div id="tryon-modal" class="hidden">
+    <div class="modal-backdrop" data-close-tryon></div>
+    <div class="tryon-card">
+      <button class="modal-close" data-close-tryon>✕</button>
+      <h3 id="tryon-title">Preview</h3>
+      <div class="tryon-stage">
+        <div class="tryon-spinner" id="tryon-spinner">
+          <div class="spin"></div>
+          <p>Rendering your preview…</p>
+          <span>this takes about 15 seconds</span>
+        </div>
+        <img id="tryon-img" alt="AI try-on preview" hidden />
+      </div>
+      <p class="tryon-disclaimer" id="tryon-disclaimer"></p>
     </div>
   </div>
 

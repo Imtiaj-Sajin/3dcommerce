@@ -13,6 +13,7 @@ import { spawnVisitors } from './visitors.js';
 import { ThirdPersonCamera } from './cameraRig.js';
 import { Interactions } from './interactions.js';
 import { UI } from './ui.js';
+import { ShopperAI } from './shopperAI.js';
 
 const canvas = document.getElementById('scene');
 
@@ -97,6 +98,34 @@ const ui = new UI({
     goTo(zone);
   },
 });
+
+/* ---------------- shopper AI ----------------
+ * Search bar, photo search and the try-on preview. Clicking a result walks
+ * the player over to that pedestal before opening the card. */
+
+const shopperAI = new ShopperAI({
+  space: spaceSlug,
+  ui,
+  onWalkTo: (productId) => {
+    const view = shop.productViews.get(productId);
+    if (!view || !player) return;
+    const spot = new THREE.Vector3();
+    view.group.getWorldPosition(spot);
+    // stop a step short of the pedestal so the card stays in view
+    const toPlayer = new THREE.Vector3().subVectors(player.root.position, spot).setY(0);
+    if (toPlayer.lengthSq() < 1e-4) toPlayer.set(0, 0, 1);
+    spot.addScaledVector(toPlayer.normalize(), 1.9);
+    player.setDestination(spot);
+    shopperAI.closePanel();
+  },
+});
+
+// Reset the try-on panel whenever a different product card is opened.
+const openProduct = ui.openProduct.bind(ui);
+ui.openProduct = (id) => {
+  openProduct(id);
+  shopperAI.resetTryOn();
+};
 
 const interactions = new Interactions(camera, canvas, shop.interactables, {
   onProduct: (id) => ui.openProduct(id),

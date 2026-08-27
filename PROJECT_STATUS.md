@@ -15,6 +15,7 @@ and are written into `.env`. Treat all of them as public:
 | Secret | Action |
 | --- | --- |
 | OpenAI key `sk-proj-I2vf…` | Revoke at platform.openai.com → API keys, issue a new one |
+| Hugging Face `hf_NJuf…` | Revoke at huggingface.co → Settings → Access Tokens |
 | Gemini key `AQ.Ab8RN…` | Revoke in Google AI Studio, issue a new one |
 | MySQL `odin` / `odin156100` | Change the password; the DB is also open to the internet on 31.97.211.4:3306 |
 | Admin login `ChangeMe!2026` | Change it at /admin → Settings |
@@ -69,7 +70,7 @@ Everything goes through the orchestrator:
 | `search` — sentence → filters | ✅ verified |
 | `vision` — photo → matches | ✅ verified (recognises adidas, returns Samba first) |
 | `merchandiser` — island picks | ✅ verified |
-| `stylist` — try-on render | ✅ works via OpenAI fallback (see caveat) |
+| `stylist` — try-on render | ✅ works via Hugging Face (free tier, ~12s) |
 | router (`/api/ai/ask`) | ✅ picks an agent or refuses |
 
 Providers: Groq → OpenAI → Gemini, skipping any that is unconfigured, falling
@@ -102,11 +103,16 @@ All green as of this commit.
 
 ## Caveats / known gaps
 
-1. **Gemini image generation is quota-blocked** on the current key — every
-   image model returns 429. Gemini *text* works fine. Try-on therefore falls
-   back to OpenAI `gpt-image-1`, which works (~50s, ~2MB PNG). Enable billing
-   on Gemini or keep using OpenAI. A sample render is at `tmp/tryon.png` —
-   **I have not visually reviewed it**; check it looks right before shipping.
+1. **Try-on cannot match the exact shoe.** The free Hugging Face tier only
+   reaches text-to-image models; image *editing* (which would let us condition
+   on the real product photo) lives on paid providers. So the stylist
+   describes the photo in words with the vision agent and renders from that.
+   Colour, silhouette and materials carry over well, but fine model detailing
+   does not — a Samba may come back looking like a Superstar. To fix properly,
+   either add credits to a HF image-editing provider (fal-ai / replicate) or
+   put `gemini` first once its image quota is available.
+   Gemini image models are currently 429 quota-blocked on this key; its text
+   models work fine.
 2. **Only the `l_hall` room geometry exists.** `boutique` and `gallery` are
    defined in the DB and served by the API, but there is no 3D room built for
    them yet — every space currently renders in the L-hall room.
@@ -139,22 +145,11 @@ are already in `architectures.layout_json`.
 For each of the 9 spaces: create categories, then use the admin's AI autofill
 to add products quickly. The capacity rules will keep it honest.
 
-### 4. Shopper-facing search UI
-The API is done; the in-world UI is not. Add a search bar + camera button to
-the HUD calling `aiSearch()` / `aiSearchImage()` from `src/api.js`, and show
-results as a floating panel that walks you to the product.
-
-### 5. Try-on in the shopper UI
-Add a "See it on me" button in the product modal calling `aiTryOn()`, with a
-size picker (XS–XXL) and an optional selfie upload. The backend is done. Keep
-the selfie transient — it is never written to disk today, and it should stay
-that way.
-
-### 6. Orders
+### 4. Orders
 `orders` + `order_items` tables, a checkout endpoint, and an Orders view in
 the admin. Payment provider after that.
 
-### 7. Multi-person
+### 5. Multi-person
 Add a WebSocket server broadcasting `{spaceSlug, position, heading, animation}`
 per player. `src/visitors.js` already models remote avatars exactly the way a
 networked player would work — swap the wander logic for network state and it

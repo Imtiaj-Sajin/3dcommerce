@@ -13,7 +13,9 @@
     "db:seed": "node scripts/gen-seed.mjs",
     "sql:build": "node scripts/build-sql.mjs",
     "test:api": "node scripts/smoke.mjs",
-    "test:browser": "node scripts/browser-smoke.mjs"
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:shopper": "node scripts/shopper-smoke.mjs",
+    "test:admin": "node scripts/admin-smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
