@@ -31,8 +31,9 @@ the app a least-privilege user (it does not need `DROP`, `SUPER` or
 ## What is built and verified
 
 ### Database — done
-16 tables in `metama_db`, already applied to the live server.
-`sql/metamart_full.sql` is the single importable file (phpMyAdmin → Import).
+16 tables in `metama_db`, live on the server.
+`sql/metamart_full.sql` is a **dump of the live database** (regenerate with
+`npm run sql:dump`), verified to re-import cleanly into an empty schema.
 
 Key idea: **architectures** define how much a room can physically display, and
 those limits are enforced in the API.
@@ -43,8 +44,19 @@ those limits are enforced in the API.
 | `gallery` | 7 | 5 | — |
 | `boutique` | 4 | 5 | 3 |
 
-Seeded: 10 spaces (SoleSpace live + 9 tenants), 6 categories, 25 products with
-real photos, 150 size variants, 3 highlight campaigns, 4 discounts.
+Contents: 10 spaces (**3 live**), 18 categories, **73 products**, 414 size
+variants, 5 highlight campaigns, 4 discounts.
+
+| Store | Categories | Products | Island | Imagery |
+| --- | --- | --- | --- | --- |
+| SoleSpace | 6 brands | 25 | SALE % | real catalogue photos |
+| Men's Wear | 6 | 24 | NEW IN | drawn (garment-art.mjs) |
+| Women's Wear | 6 | 24 | NEW IN | drawn (garment-art.mjs) |
+
+The clothing stores use METAMART house labels rather than real brands:
+putting a real brand's name on a garment we drew would be inventing their
+product line. Rebuild their art with `npm run apparel:images` and reload
+them with `npm run apparel:load`.
 
 ### Backend API — done
 `server/` — Express, JWT auth, role gates (`owner` > `admin` > `editor`),
@@ -135,13 +147,15 @@ All green as of this commit — 49 checks total.
    Gemini image models are currently 429 quota-blocked on this key; its text
    models work fine.
 2. **Only the `l_hall` room geometry exists.** `boutique` and `gallery` are
-   defined in the DB and served by the API, but there is no 3D room built for
-   them yet — every space currently renders in the L-hall room.
+   defined in the DB and served by the API, but no 3D room is built for them,
+   so all three live stores are assigned `l_hall`. That room exposes six wall
+   slots, which is why each store has six categories rather than eight.
 3. **Entering a tenant reloads the page** (`?space=slug`). That genuinely
    guarantees the old space is freed, but it is not a seamless walk-through
    yet. See next steps.
-4. The 9 tenant spaces have **no products** — they are `coming_soon`, so
-   clicking a bay shows a "leasing now" toast.
+4. **Seven tenant bays are still empty** (Gadgets, Bags, Sports, Watches,
+   Beauty, Kids, Home) — they are `coming_soon`, so clicking one shows a
+   "leasing now" toast.
 5. Cart is client-side only; there is no orders table, checkout or payment.
 6. No multi-person yet (deferred by you).
 
@@ -162,9 +176,11 @@ exposing the same interface (`interactables`, `browsePoints`, `colliders`,
 `update`, `sun`). Pick the builder from `space.architecture`. The layout slots
 are already in `architectures.layout_json`.
 
-### 3. Stock the other tenants
-For each of the 9 spaces: create categories, then use the admin's AI autofill
-to add products quickly. The capacity rules will keep it honest.
+### 3. Stock the remaining seven tenants
+The pattern is established: `scripts/apparel-catalogue.mjs` defines the
+catalogue, `garment-art.mjs` draws the imagery, `load-apparel.mjs` pushes it
+through the admin API. Copy that shape per store, or add products by hand in
+/admin using the AI autofill. Capacity rules keep it honest either way.
 
 ### 4. Orders
 `orders` + `order_items` tables, a checkout endpoint, and an Orders view in
@@ -192,9 +208,10 @@ npm run build      # then :8787 serves the built client too
 | http://localhost:8787/admin | admin console |
 | http://localhost:8787/api/health | API + DB + provider status |
 
-Useful scripts: `npm run db:seed` (regenerate seed from the front-end
-catalogue), `npm run db:apply` (schema + seed), `npm run sql:build` (rebuild
-the single import file).
+Useful scripts: `npm run db:apply` (schema + seed from scratch),
+`npm run sql:dump` (dump the live DB to sql/metamart_full.sql),
+`npm run apparel:images` / `npm run apparel:load` (rebuild and reload the
+clothing stores).
 
 ## Deploying to the VPS
 

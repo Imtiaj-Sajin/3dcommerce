@@ -1,711 +1,1440 @@
 -- ============================================================
---  METAMART - complete database
---  Import this file into an EMPTY database (e.g. metama_db).
+--  METAMART - complete database dump
+--  Generated 2026-08-27T06:36:02.617Z by scripts/db-dump.mjs
 --
+--  Import into an EMPTY database (e.g. metama_db).
 --  phpMyAdmin:  select the database -> Import -> choose this file -> Go
 --  CLI:         mysql -u USER -p DBNAME < metamart_full.sql
 --
---  WARNING: the schema section drops these tables if they already exist.
+--  WARNING: this DROPS each table before recreating it.
 --
---  After importing, sign in to /admin with:
---      admin@metamart.local  /  ChangeMe!2026
---  and change that password immediately under Settings.
+--  Default admin login is whatever it is in your live database. If this
+--  came from a fresh seed it is admin@metamart.local / ChangeMe!2026 -
+--  change it under /admin -> Settings after importing.
 -- ============================================================
 
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 START TRANSACTION;
 
--- ============================================================
---  METAMART - virtual commerce platform
---  Schema for MySQL 8.0+   (charset utf8mb4)
--- ============================================================
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
+-- ------------------------------------------------------------
+-- architectures
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `architectures`;
+CREATE TABLE `architectures` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `max_categories` tinyint unsigned NOT NULL DEFAULT '8',
+  `max_products_per_category` tinyint unsigned NOT NULL DEFAULT '5',
+  `has_highlight_island` tinyint(1) NOT NULL DEFAULT '1',
+  `highlight_capacity` tinyint unsigned NOT NULL DEFAULT '4',
+  `layout_json` json DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP TABLE IF EXISTS audit_log, ai_jobs, settings,
-  highlight_items, highlights, discounts,
-  product_tags, tags, product_variants, product_images, product_search,
-  products, categories, spaces, architectures, admin_users;
+INSERT INTO `architectures` (`id`, `code`, `name`, `description`, `max_categories`, `max_products_per_category`, `has_highlight_island`, `highlight_capacity`, `layout_json`, `created_at`, `updated_at`) VALUES
+  (1, 'l_hall', 'L-Hall Flagship', 'Anchor store: main hall plus a wing, brand walls on three sides and a highlight island in the centre.', 8, 5, 1, 4, '{"regions":["hall","wing"],"categorySlots":[{"slot":0,"wall":"west","label":"Main hall west"},{"slot":1,"wall":"north","label":"Main hall north"},{"slot":2,"wall":"east","label":"Main hall east"},{"slot":3,"wall":"wing_west","label":"Wing west"},{"slot":4,"wall":"wing_east","label":"Wing east"},{"slot":5,"wall":"wing_south","label":"Wing south"},{"slot":6,"wall":"hall_south_a","label":"Hall south A"},{"slot":7,"wall":"hall_south_b","label":"Hall south B"}]}', '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (2, 'boutique', 'Boutique Room', 'Single square room, four display walls and a small centre plinth. For smaller tenants.', 4, 5, 1, 3, '{"regions":["room"],"categorySlots":[{"slot":0,"wall":"west","label":"West wall"},{"slot":1,"wall":"north","label":"North wall"},{"slot":2,"wall":"east","label":"East wall"},{"slot":3,"wall":"south","label":"South wall"}]}', '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (3, 'gallery', 'Gallery Loft', 'Long daylight gallery with six bays down two colonnades and an end-wall feature.', 7, 5, 0, 0, '{"regions":["gallery"],"categorySlots":[{"slot":0,"wall":"bay_w1","label":"West bay 1"},{"slot":1,"wall":"bay_w2","label":"West bay 2"},{"slot":2,"wall":"bay_w3","label":"West bay 3"},{"slot":3,"wall":"bay_e1","label":"East bay 1"},{"slot":4,"wall":"bay_e2","label":"East bay 2"},{"slot":5,"wall":"bay_e3","label":"East bay 3"},{"slot":6,"wall":"end","label":"End wall feature"}]}', '2026-08-26 18:50:37', '2026-08-26 18:50:37');
+
+-- ------------------------------------------------------------
+-- spaces
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `spaces`;
+CREATE TABLE `spaces` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tagline` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `architecture_id` int unsigned NOT NULL,
+  `accent_color` char(7) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#00e5ff',
+  `bay_index` tinyint DEFAULT NULL COMMENT 'plaza bay 0..8, NULL = gate/anchor store',
+  `status` enum('live','coming_soon','hidden') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'coming_soon',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `slug` (`slug`),
+  UNIQUE KEY `uq_space_bay` (`bay_index`),
+  KEY `fk_space_arch` (`architecture_id`),
+  KEY `idx_space_status` (`status`),
+  CONSTRAINT `fk_space_arch` FOREIGN KEY (`architecture_id`) REFERENCES `architectures` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `spaces` (`id`, `slug`, `name`, `tagline`, `description`, `architecture_id`, `accent_color`, `bay_index`, `status`, `sort_order`, `created_at`, `updated_at`) VALUES
+  (1, 'solespace', 'SoleSpace', 'Sneakers, curated.', 'The anchor store of METAMART: six brand walls across a daylight hall and wing, plus a rotating highlight island.', 1, '#00e5ff', NULL, 'live', 0, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (2, 'menswear', 'Men\'s Wear', 'Everyday tailoring and weekend layers.', 'Six walls of wardrobe staples: tees and shirts you will wear to death, outerwear that earns its keep, and trousers cut for real legs.', 1, '#4cc9f0', 0, 'live', 1, '2026-08-26 18:50:37', '2026-08-27 06:15:52'),
+  (3, 'womenswear', 'Women\'s Wear', 'Pieces with a point of view.', 'Six walls that move from soft knits to sharp tailoring: dresses that need no occasion, jackets with structure, and trousers cut to actually sit right.', 1, '#ff7ab6', 1, 'live', 2, '2026-08-26 18:50:37', '2026-08-27 06:19:24'),
+  (4, 'gadgets', 'Gadgets', 'Opening soon on METAMART.', NULL, 2, '#9b5de5', 2, 'coming_soon', 3, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (5, 'bags', 'Bags & Luggage', 'Opening soon on METAMART.', NULL, 2, '#c98b5e', 3, 'coming_soon', 4, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (6, 'sports', 'Sports & Jerseys', 'Opening soon on METAMART.', NULL, 3, '#3ddc84', 4, 'coming_soon', 5, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (7, 'watches', 'Watches', 'Opening soon on METAMART.', NULL, 2, '#ffd166', 5, 'coming_soon', 6, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (8, 'beauty', 'Beauty', 'Opening soon on METAMART.', NULL, 2, '#ff6a8a', 6, 'coming_soon', 7, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (9, 'kids', 'Kids & Toys', 'Opening soon on METAMART.', NULL, 3, '#ffa94d', 7, 'coming_soon', 8, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (10, 'home', 'Home & Living', 'Opening soon on METAMART.', NULL, 2, '#2ec4b6', 8, 'coming_soon', 9, '2026-08-26 18:50:37', '2026-08-26 18:50:37');
+
+-- ------------------------------------------------------------
+-- categories
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `categories`;
+CREATE TABLE `categories` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `space_id` int unsigned NOT NULL,
+  `slug` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `accent_color` char(7) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#00e5ff',
+  `slot_index` tinyint unsigned NOT NULL COMMENT 'physical zone slot in the room',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_cat_slug` (`space_id`,`slug`),
+  UNIQUE KEY `uq_cat_slot` (`space_id`,`slot_index`),
+  CONSTRAINT `fk_cat_space` FOREIGN KEY (`space_id`) REFERENCES `spaces` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `categories` (`id`, `space_id`, `slug`, `name`, `accent_color`, `slot_index`, `sort_order`, `is_active`, `created_at`, `updated_at`) VALUES
+  (1, 1, 'nike', 'Nike', '#ff6a2b', 0, 0, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (2, 1, 'jordan', 'Jordan', '#e63946', 1, 1, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (3, 1, 'adidas', 'adidas', '#4895ef', 2, 2, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (4, 1, 'newbalance', 'New Balance', '#2ec4b6', 3, 3, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (5, 1, 'asics', 'ASICS', '#9b5de5', 4, 4, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (6, 1, 'converse', 'Converse', '#ffd166', 5, 5, 1, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (21, 2, 'tees', 'T-Shirts', '#4cc9f0', 0, 0, 1, '2026-08-27 06:15:54', '2026-08-27 06:15:54'),
+  (22, 2, 'shirts', 'Shirts', '#5bd1ff', 1, 1, 1, '2026-08-27 06:15:55', '2026-08-27 06:15:55'),
+  (23, 2, 'hoodies', 'Hoodies & Sweats', '#38b6e0', 2, 2, 1, '2026-08-27 06:15:57', '2026-08-27 06:15:57'),
+  (24, 2, 'jackets', 'Jackets', '#2f9fd0', 3, 3, 1, '2026-08-27 06:15:58', '2026-08-27 06:15:58'),
+  (25, 2, 'trousers', 'Trousers', '#4cc9f0', 4, 4, 1, '2026-08-27 06:16:00', '2026-08-27 06:16:00'),
+  (26, 2, 'shorts', 'Shorts', '#6ad6ff', 5, 5, 1, '2026-08-27 06:16:02', '2026-08-27 06:16:02'),
+  (27, 3, 'tops', 'Tops', '#ff7ab6', 0, 0, 1, '2026-08-27 06:19:26', '2026-08-27 06:19:26'),
+  (28, 3, 'dresses', 'Dresses', '#ff9ec9', 1, 1, 1, '2026-08-27 06:19:27', '2026-08-27 06:19:27'),
+  (29, 3, 'knitwear', 'Knitwear', '#f06fae', 2, 2, 1, '2026-08-27 06:19:29', '2026-08-27 06:19:29'),
+  (30, 3, 'outerwear', 'Jackets & Coats', '#e05c9c', 3, 3, 1, '2026-08-27 06:19:30', '2026-08-27 06:19:30'),
+  (31, 3, 'skirts', 'Skirts', '#ff8fc0', 4, 4, 1, '2026-08-27 06:19:32', '2026-08-27 06:19:32'),
+  (32, 3, 'trousers-w', 'Trousers', '#ffa9d1', 5, 5, 1, '2026-08-27 06:19:34', '2026-08-27 06:19:34');
+
+-- ------------------------------------------------------------
+-- products
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `products`;
+CREATE TABLE `products` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `space_id` int unsigned NOT NULL,
+  `category_id` int unsigned NOT NULL,
+  `sku` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `brand` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `short_description` varchar(320) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `price_cents` int unsigned NOT NULL DEFAULT '0',
+  `compare_at_price_cents` int unsigned DEFAULT NULL COMMENT 'original price when discounted',
+  `currency` char(3) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'USD',
+  `slot_index` tinyint unsigned NOT NULL DEFAULT '0' COMMENT 'pedestal slot in its zone',
+  `status` enum('active','draft','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `badge` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'NEW / ICON / TRENDING / HEAT',
+  `colorway` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `material` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rating` decimal(3,2) DEFAULT NULL,
+  `review_count` int unsigned NOT NULL DEFAULT '0',
+  `stock` int NOT NULL DEFAULT '0',
+  `attributes_json` json DEFAULT NULL,
+  `ai_fields_json` json DEFAULT NULL COMMENT 'which fields were AI-filled + confidence',
+  `created_by` int unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `sku` (`sku`),
+  UNIQUE KEY `uq_prod_slug` (`space_id`,`slug`),
+  KEY `idx_prod_cat` (`category_id`,`status`),
+  KEY `idx_prod_space` (`space_id`,`status`),
+  KEY `idx_prod_brand` (`brand`),
+  FULLTEXT KEY `ft_prod` (`name`,`brand`,`short_description`,`description`,`colorway`),
+  CONSTRAINT `fk_prod_cat` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_prod_space` FOREIGN KEY (`space_id`) REFERENCES `spaces` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=82 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `products` (`id`, `space_id`, `category_id`, `sku`, `slug`, `name`, `brand`, `short_description`, `description`, `price_cents`, `compare_at_price_cents`, `currency`, `slot_index`, `status`, `badge`, `colorway`, `material`, `rating`, `review_count`, `stock`, `attributes_json`, `ai_fields_json`, `created_by`, `created_at`, `updated_at`) VALUES
+  (1, 1, 1, 'SS-NIK-01-DUNKPANDA', 'dunk-panda', 'Dunk Low "Panda"', 'Nike', 'The black-and-white staple that refuses to stay in stock. Goes with everything you own.', 'The black-and-white staple that refuses to stay in stock. Goes with everything you own.', 11500, NULL, 'USD', 0, 'active', NULL, NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"dunk-panda"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (2, 1, 1, 'SS-NIK-02-AF1WHITE', 'af1-white', 'Air Force 1 \'07', 'Nike', 'Triple white. The most worn sneaker on planet Earth, and still undefeated.', 'Triple white. The most worn sneaker on planet Earth, and still undefeated.', 11000, NULL, 'USD', 1, 'active', NULL, NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"af1-white"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (3, 1, 1, 'SS-NIK-03-DUNKGREYFO', 'dunk-grey-fog', 'Dunk Low "Grey Fog"', 'Nike', 'Soft grey overlays on crisp white leather. The Panda\'s calmer sibling.', 'Soft grey overlays on crisp white leather. The Panda\'s calmer sibling.', 11000, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"dunk-grey-fog"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (4, 1, 1, 'SS-NIK-04-KOBE6GRINC', 'kobe-6-grinch', 'Kobe 6 "Reverse Grinch"', 'Nike', 'Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', 'Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', 19000, NULL, 'USD', 3, 'active', 'HEAT', NULL, NULL, NULL, 0, 41, '{"source":"seed","original_id":"kobe-6-grinch"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (5, 1, 2, 'SS-JOR-01-AJ3WHITECE', 'aj3-white-cement', 'Air Jordan 3 "White Cement"', 'Jordan', 'Elephant print, visible Air, and history in every step. The \'88 icon reimagined.', 'Elephant print, visible Air, and history in every step. The \'88 icon reimagined.', 20000, NULL, 'USD', 0, 'active', NULL, NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"aj3-white-cement"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (6, 1, 2, 'SS-JOR-02-AJ4MILITAR', 'aj4-military', 'Air Jordan 4 "Military Black"', 'Jordan', 'Clean white base, black hits, endless outfit rotation. A modern-day essential.', 'Clean white base, black hits, endless outfit rotation. A modern-day essential.', 21500, NULL, 'USD', 1, 'active', 'ICON', NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"aj4-military"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (7, 1, 2, 'SS-JOR-03-AJ11COOLGR', 'aj11-cool-grey', 'Air Jordan 11 "Cool Grey"', 'Jordan', 'Patent leather shine in signature Cool Grey. Dress code approved, court certified.', 'Patent leather shine in signature Cool Grey. Dress code approved, court certified.', 22500, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"aj11-cool-grey"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (8, 1, 3, 'SS-ADI-01-SAMBAOG', 'samba-og', 'Samba OG', 'adidas', 'Terrace classic turned global fashion staple. White leather, gum sole, done.', 'Terrace classic turned global fashion staple. White leather, gum sole, done.', 10000, NULL, 'USD', 0, 'active', 'TRENDING', NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"samba-og"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (9, 1, 3, 'SS-ADI-02-CAMPUS00S', 'campus-00s', 'Campus 00s', 'adidas', 'Chunky Y2K proportions with premium suede. The skate-shop look, revived.', 'Chunky Y2K proportions with premium suede. The skate-shop look, revived.', 11000, NULL, 'USD', 1, 'active', NULL, NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"campus-00s"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (10, 1, 3, 'SS-ADI-03-SUPERSTAR', 'superstar', 'Superstar', 'adidas', 'Shell toe. Three stripes. Fifty years of street cred in one silhouette.', 'Shell toe. Three stripes. Fifty years of street cred in one silhouette.', 9500, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"superstar"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (11, 1, 3, 'SS-ADI-04-YEEZY350ZE', 'yeezy-350-zebra', 'Yeezy Boost 350 V2 "Zebra"', 'adidas', 'The unmistakable stripe pattern on Primeknit, riding full-length Boost.', 'The unmistakable stripe pattern on Primeknit, riding full-length Boost.', 23000, NULL, 'USD', 3, 'active', NULL, NULL, NULL, NULL, 0, 41, '{"source":"seed","original_id":"yeezy-350-zebra"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (12, 1, 4, 'SS-NEW-01-NB550', 'nb-550', '550 "White Grey"', 'New Balance', 'The \'89 basketball shape that took over the streets. Perfectly aged proportions.', 'The \'89 basketball shape that took over the streets. Perfectly aged proportions.', 13000, NULL, 'USD', 0, 'active', NULL, NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"nb-550"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (13, 1, 4, 'SS-NEW-02-NB2002RRAI', 'nb-2002r-rain', '2002R "Rain Cloud"', 'New Balance', 'Protection Pack construction with soft layered greys. Comfort with edge.', 'Protection Pack construction with soft layered greys. Comfort with edge.', 15000, NULL, 'USD', 1, 'active', 'NEW', NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"nb-2002r-rain"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (14, 1, 4, 'SS-NEW-03-NB9060', 'nb-9060', '9060 "Sea Salt"', 'New Balance', 'Warped lines and creamy tones — a futurist remix of the classic 99X series.', 'Warped lines and creamy tones — a futurist remix of the classic 99X series.', 16000, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"nb-9060"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (15, 1, 5, 'SS-ASI-01-GELKAYANO1', 'gel-kayano-14', 'GEL-Kayano 14', 'ASICS', 'Y2K running tech turned runway favorite. White and pure silver mesh magic.', 'Y2K running tech turned runway favorite. White and pure silver mesh magic.', 15000, NULL, 'USD', 0, 'active', 'NEW', NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"gel-kayano-14"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (16, 1, 5, 'SS-ASI-02-GEL1130', 'gel-1130', 'GEL-1130 "Clay Canyon"', 'ASICS', 'Retro runner DNA with modern comfort. The quiet flex of people who know.', 'Retro runner DNA with modern comfort. The quiet flex of people who know.', 12000, NULL, 'USD', 1, 'active', NULL, NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"gel-1130"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (17, 1, 5, 'SS-ASI-03-GELNYCARCT', 'gel-nyc-arctic', 'GEL-NYC "Arctic Sky"', 'ASICS', 'Layered cream and icy blue inspired by early-2000s city marathons.', 'Layered cream and icy blue inspired by early-2000s city marathons.', 13000, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"gel-nyc-arctic"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (18, 1, 5, 'SS-ASI-04-GELNYCGRAP', 'gel-nyc-graphite', 'GEL-NYC "Graphite"', 'ASICS', 'Tonal grey stack with reflective hits. Urban camouflage, elevated.', 'Tonal grey stack with reflective hits. Urban camouflage, elevated.', 13000, NULL, 'USD', 3, 'active', NULL, NULL, NULL, NULL, 0, 41, '{"source":"seed","original_id":"gel-nyc-graphite"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (19, 1, 6, 'SS-CON-01-CHUCKHI', 'chuck-hi', 'Chuck Taylor All Star Hi', 'Converse', 'The canvas high-top that started it all. Every generation makes it theirs.', 'The canvas high-top that started it all. Every generation makes it theirs.', 6500, NULL, 'USD', 0, 'active', NULL, NULL, NULL, NULL, 0, 20, '{"source":"seed","original_id":"chuck-hi"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (20, 1, 6, 'SS-CON-02-CHUCK70OX', 'chuck-70-ox', 'Chuck 70 Ox "Parchment"', 'Converse', 'Vintage-spec construction, warmer canvas, higher foxing. The connoisseur\'s Chuck.', 'Vintage-spec construction, warmer canvas, higher foxing. The connoisseur\'s Chuck.', 8500, NULL, 'USD', 1, 'active', NULL, NULL, NULL, NULL, 0, 27, '{"source":"seed","original_id":"chuck-70-ox"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (21, 1, 6, 'SS-CON-03-RUNSTARHIK', 'run-star-hike', 'Run Star Hike', 'Converse', 'The Chuck on a platform lugged sole. Height, attitude, and grip included.', 'The Chuck on a platform lugged sole. Height, attitude, and grip included.', 11000, NULL, 'USD', 2, 'active', NULL, NULL, NULL, NULL, 0, 34, '{"source":"seed","original_id":"run-star-hike"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (22, 1, 3, 'SS-ADI-05-YEEZYFOAMR', 'yeezy-foam-rnnr', 'Yeezy Foam Runner "Onyx"', 'adidas', 'Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.', 'Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.', 9000, NULL, 'USD', 4, 'active', 'SALE', NULL, NULL, NULL, 0, 48, '{"source":"seed","original_id":"yeezy-foam-rnnr"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (23, 1, 4, 'SS-NEW-04-NB530', 'nb-530', 'New Balance 530', 'New Balance', 'Silvery retro runner with everyday comfort. Last sizes going fast.', 'Silvery retro runner with everyday comfort. Last sizes going fast.', 10000, NULL, 'USD', 3, 'active', 'SALE', NULL, NULL, NULL, 0, 41, '{"source":"seed","original_id":"nb-530"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (24, 1, 5, 'SS-ASI-05-GEL1130BLA', 'gel-1130-black', 'ASICS GEL-1130 "Black"', 'ASICS', 'The stealth colorway of the fan favorite. Discounted, not discontinued.', 'The stealth colorway of the fan favorite. Discounted, not discontinued.', 12000, NULL, 'USD', 4, 'active', 'SALE', NULL, NULL, NULL, 0, 48, '{"source":"seed","original_id":"gel-1130-black"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (25, 1, 4, 'SS-NEW-05-NB1906R', 'nb-1906r', 'New Balance 1906R', 'New Balance', 'Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.', 'Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.', 15500, NULL, 'USD', 4, 'active', 'SALE', NULL, NULL, NULL, 0, 48, '{"source":"seed","original_id":"nb-1906r"}', NULL, NULL, '2026-08-26 18:50:37', '2026-08-26 18:50:37'),
+  (33, 2, 21, 'MEN-TEE-MTB4Q4T3', 'heavyweight-box-tee', 'Heavyweight Box Tee', 'NORTHLINE', 'A tee with enough weight to hold its shape through a hundred washes.', 'Boxy 240gsm cotton with a ribbed collar that will not curl. The one you reach for when you have not thought about it.', 4800, NULL, 'USD', 0, 'active', 'NEW', 'off-white', '240gsm cotton', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:16:04', '2026-08-27 06:16:04'),
+  (34, 2, 21, 'MEN-TEE-MTB4QB6N', 'long-sleeve-rib-tee', 'Long Sleeve Rib Tee', 'NORTHLINE', 'Ribbed cotton that hugs the arms and stays put under a jacket.', 'A slim ribbed long sleeve in deep charcoal. Layers flat under knitwear and looks deliberate on its own.', 5600, NULL, 'USD', 1, 'active', NULL, 'charcoal', 'ribbed cotton', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:16:12', '2026-08-27 06:16:12'),
+  (35, 2, 21, 'MEN-TEE-MTB4QGXM', 'pocket-tee', 'Pocket Tee', 'ATELIER 9', 'Garment-dyed navy with a chest pocket that actually holds things.', 'Washed after dyeing so it arrives already soft and slightly faded. The pocket is reinforced, not decorative.', 4200, NULL, 'USD', 2, 'active', NULL, 'washed navy', 'garment-dyed cotton', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:16:20', '2026-08-27 06:16:20'),
+  (36, 2, 21, 'MEN-TEE-MTB4QMOT', 'striped-crew-tee', 'Striped Crew Tee', 'ATELIER 9', 'Wide breton stripes on a relaxed crew — quietly nautical.', 'Ecru and black stripes on soft jersey with a relaxed body. Works with denim, works with tailoring.', 5200, NULL, 'USD', 3, 'active', NULL, 'ecru / black', 'cotton jersey', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:16:27', '2026-08-27 06:16:27'),
+  (37, 2, 22, 'MEN-SHI-MTB4QSG4', 'oxford-button-down', 'Oxford Button-Down', 'NORTHLINE', 'The pale blue oxford. Nothing here is more useful.', 'Woven oxford cotton with a soft roll to the collar. Smart enough for a meeting, forgiving enough for a Sunday.', 9800, NULL, 'USD', 0, 'active', 'ICON', 'pale blue', 'cotton oxford', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:16:35', '2026-08-27 06:16:35'),
+  (38, 2, 22, 'MEN-SHI-MTB4QYSM', 'camp-collar-shirt', 'Camp Collar Shirt', 'KADENCE', 'Open collar, linen blend, built for heat.', 'A relaxed camp collar in a breathable linen blend. Wear it open over a tee when the afternoon gets serious.', 8800, NULL, 'USD', 1, 'active', NULL, 'sand', 'linen blend', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:16:43', '2026-08-27 06:16:43'),
+  (39, 2, 22, 'MEN-SHI-MTB4R4JN', 'flannel-overshirt', 'Flannel Overshirt', 'KADENCE', 'Thick enough to count as a jacket in September.', 'Brushed cotton flannel in a forest check, cut long with a chest pocket. Half shirt, half light jacket.', 11500, NULL, 'USD', 2, 'active', NULL, 'forest check', 'brushed cotton flannel', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:16:50', '2026-08-27 06:16:50'),
+  (40, 2, 22, 'MEN-SHI-MTB4RAW2', 'denim-western-shirt', 'Denim Western Shirt', 'ATELIER 9', 'Snap buttons, pointed yokes, proper indigo.', 'A western-cut denim shirt in mid indigo that fades where you bend. Snaps, not buttons — as it should be.', 10500, NULL, 'USD', 3, 'active', NULL, 'mid indigo', 'cotton denim', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:16:58', '2026-08-27 06:16:58'),
+  (41, 2, 23, 'MEN-HOO-MTB4RGNQ', 'heavy-loopback-hoodie', 'Heavy Loopback Hoodie', 'NORTHLINE', 'Loopback cotton with a hood that actually stands up.', 'Dense loopback cotton, double-lined hood, ribbed cuffs that keep their grip. It gets better the more you wear it.', 12800, NULL, 'USD', 0, 'active', 'TRENDING', 'heather grey', 'loopback cotton', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:17:06', '2026-08-27 06:17:06'),
+  (42, 2, 23, 'MEN-HOO-MTB4RN07', 'zip-through-hoodie', 'Zip-Through Hoodie', 'NORTHLINE', 'Full-zip brushed fleece for the ten degrees either side of comfortable.', 'Brushed back fleece with a full metal zip and deep hand pockets. The layer you take off and put back on all day.', 13800, NULL, 'USD', 1, 'active', NULL, 'black', 'brushed fleece', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:17:14', '2026-08-27 06:17:14'),
+  (43, 2, 23, 'MEN-HOO-MTB4RTCP', 'crewneck-sweatshirt', 'Crewneck Sweatshirt', 'ATELIER 9', 'A plain oat crewneck — the least complicated thing you own.', 'Mid-weight cotton fleece with a V-insert at the collar so it holds shape. No logo, no message, no fuss.', 10800, NULL, 'USD', 2, 'active', NULL, 'oat', 'cotton fleece', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:17:22', '2026-08-27 06:17:22'),
+  (44, 2, 23, 'MEN-HOO-MTB4RZP9', 'quarter-zip-knit', 'Quarter-Zip Knit', 'KADENCE', 'Merino blend quarter-zip that passes for smart.', 'A fine-gauge merino blend with a short placket zip. Warmer than it looks and neat enough for the office.', 14500, NULL, 'USD', 3, 'active', NULL, 'navy', 'merino blend', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:17:31', '2026-08-27 06:17:31'),
+  (45, 2, 24, 'MEN-JAC-MTB4S61W', 'waxed-chore-jacket', 'Waxed Chore Jacket', 'KADENCE', 'Waxed cotton, four pockets, ages like it owes you money.', 'A workwear chore coat in waxed olive cotton with four square pockets. Sheds a shower and earns its creases.', 24500, NULL, 'USD', 0, 'active', 'ICON', 'olive', 'waxed cotton', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:17:39', '2026-08-27 06:17:39'),
+  (46, 2, 24, 'MEN-JAC-MTB4SCEK', 'bomber-jacket', 'Bomber Jacket', 'NORTHLINE', 'Clean black nylon bomber with ribbed trims.', 'A slim technical nylon bomber with ribbed collar, cuffs and hem. Nothing extra, which is the point.', 21000, NULL, 'USD', 1, 'active', NULL, 'black', 'technical nylon', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:17:47', '2026-08-27 06:17:47'),
+  (47, 2, 24, 'MEN-JAC-MTB4SIQY', 'down-puffer', 'Down Puffer', 'NORTHLINE', 'Baffled down that packs into its own pocket.', 'Recycled down in horizontal baffles with a matte slate shell. Genuinely warm, and it folds into the chest pocket.', 32000, NULL, 'USD', 2, 'active', 'NEW', 'slate', 'recycled down', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:17:55', '2026-08-27 06:17:55'),
+  (48, 2, 24, 'MEN-JAC-MTB4SP61', 'denim-trucker', 'Denim Trucker', 'ATELIER 9', 'Rigid selvedge trucker that fades to your shape.', 'Unwashed selvedge denim in a classic trucker cut. Stiff for a month, then permanently yours.', 18500, NULL, 'USD', 3, 'active', NULL, 'rigid indigo', 'selvedge denim', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:18:04', '2026-08-27 06:18:04'),
+  (49, 2, 25, 'MEN-TRO-MTB4SVI7', 'straight-leg-jeans', 'Straight Leg Jeans', 'ATELIER 9', 'A straight leg that is neither skinny nor a tent.', 'Mid-wash denim with a straight leg and a mid rise. The proportion most people actually want.', 13500, NULL, 'USD', 0, 'active', 'TRENDING', 'mid wash', 'cotton denim', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:18:12', '2026-08-27 06:18:12'),
+  (50, 2, 25, 'MEN-TRO-MTB4T1UE', 'pleated-wide-trouser', 'Pleated Wide Trouser', 'KADENCE', 'Single-pleat twill with room through the thigh.', 'A single pleat and a wide straight leg in stone cotton twill. Drapes properly instead of clinging.', 15500, NULL, 'USD', 1, 'active', NULL, 'stone', 'cotton twill', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:18:20', '2026-08-27 06:18:20'),
+  (51, 2, 25, 'MEN-TRO-MTB4T87K', 'cargo-trouser', 'Cargo Trouser', 'NORTHLINE', 'Ripstop cargos with pockets sized for real objects.', 'Black ripstop with bellowed thigh pockets and a drawcord hem. Utility that does not read as costume.', 14500, NULL, 'USD', 2, 'active', NULL, 'black', 'ripstop cotton', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:18:28', '2026-08-27 06:18:28'),
+  (52, 2, 25, 'MEN-TRO-MTB4TEK5', 'wool-suit-trouser', 'Wool Suit Trouser', 'KADENCE', 'Charcoal wool that behaves at a wedding.', 'A tapered wool-blend trouser in charcoal with a clean front. Wears with the jacket or entirely without it.', 19500, NULL, 'USD', 3, 'active', NULL, 'charcoal', 'wool blend', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:18:36', '2026-08-27 06:18:36'),
+  (53, 2, 26, 'MEN-SHO-MTB4TKWV', 'pleated-chino-short', 'Pleated Chino Short', 'KADENCE', 'A 7-inch pleated chino short that is not trying too hard.', 'Khaki cotton twill with a single pleat and a seven-inch inseam. Long enough to sit down in.', 7800, NULL, 'USD', 0, 'active', NULL, 'khaki', 'cotton twill', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:18:45', '2026-08-27 06:18:45'),
+  (54, 2, 26, 'MEN-SHO-MTB4TR9T', 'jersey-sweat-short', 'Jersey Sweat Short', 'NORTHLINE', 'Grey sweat shorts, elastic waist, zero ambition.', 'Loopback jersey with an elastic drawcord waist and side pockets. Made for doing very little.', 6200, NULL, 'USD', 1, 'active', NULL, 'heather grey', 'cotton jersey', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:18:53', '2026-08-27 06:18:53'),
+  (55, 2, 26, 'MEN-SHO-MTB4TXNT', 'swim-short', 'Swim Short', 'ATELIER 9', 'Quick-dry nylon in a blue worth swimming in.', 'Recycled nylon that dries on the walk back, with a mesh liner and a zip back pocket.', 6800, NULL, 'USD', 2, 'active', 'NEW', 'sea blue', 'recycled nylon', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:19:01', '2026-08-27 06:19:01'),
+  (56, 2, 26, 'MEN-SHO-MTB4U40Y', 'denim-short', 'Denim Short', 'ATELIER 9', 'Cut-off denim with a turned hem, done properly.', 'Light wash denim with a fixed turn-up hem so it keeps its line. Fades with the summer.', 8500, NULL, 'USD', 3, 'active', NULL, 'light wash', 'cotton denim', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:19:09', '2026-08-27 06:19:09'),
+  (57, 3, 27, 'WOM-TOP-MTB4UOF3', 'silk-camisole', 'Silk Camisole', 'MAISON EVE', 'Bias-cut silk that catches the light and forgives dinner.', 'Washable silk cut on the bias with adjustable straps. Dresses up under a blazer, dresses down over denim.', 9500, NULL, 'USD', 0, 'active', 'NEW', 'champagne', 'washable silk', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:19:36', '2026-08-27 06:19:36');
+INSERT INTO `products` (`id`, `space_id`, `category_id`, `sku`, `slug`, `name`, `brand`, `short_description`, `description`, `price_cents`, `compare_at_price_cents`, `currency`, `slot_index`, `status`, `badge`, `colorway`, `material`, `rating`, `review_count`, `stock`, `attributes_json`, `ai_fields_json`, `created_by`, `created_at`, `updated_at`) VALUES
+  (58, 3, 27, 'WOM-TOP-MTB4UUKV', 'ribbed-long-sleeve', 'Ribbed Long Sleeve', 'MAISON EVE', 'A second-skin rib that holds its shape all day.', 'Fine stretch rib with a high neck and long sleeves. The layering piece you will buy twice.', 5800, NULL, 'USD', 1, 'active', NULL, 'black', 'stretch rib', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:19:44', '2026-08-27 06:19:44'),
+  (59, 3, 27, 'WOM-TOP-MTB4V0QE', 'poplin-blouse', 'Poplin Blouse', 'ATELIER 9', 'Crisp white poplin with volume in the sleeve.', 'Cotton poplin with a gathered shoulder and a covered placket. Sharp with tailoring, easy with jeans.', 11000, NULL, 'USD', 2, 'active', NULL, 'white', 'cotton poplin', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:19:52', '2026-08-27 06:19:52'),
+  (60, 3, 27, 'WOM-TOP-MTB4V6X1', 'cropped-knit-tee', 'Cropped Knit Tee', 'LUNA & CO', 'A short knit tee in a yellow that lifts everything.', 'Fine cotton knit with a cropped body and a rolled hem. Sits exactly at the waistband of a high trouser.', 7200, NULL, 'USD', 3, 'active', NULL, 'butter yellow', 'cotton knit', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:20:00', '2026-08-27 06:20:00'),
+  (61, 3, 28, 'WOM-DRE-MTB4VCNB', 'slip-dress', 'Slip Dress', 'MAISON EVE', 'The bias slip that goes anywhere after 6pm.', 'Bias-cut washable silk in ink navy with a cowl neck. Wears alone in summer, over a rib tee in winter.', 16500, NULL, 'USD', 0, 'active', 'TRENDING', 'ink navy', 'washable silk', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:20:07', '2026-08-27 06:20:07'),
+  (62, 3, 28, 'WOM-DRE-MTB4VIU1', 'shirt-dress', 'Shirt Dress', 'ATELIER 9', 'A belted shirt dress that solves whole mornings.', 'Striped cotton poplin with a self belt and a collar that sits open or closed. One decision, done.', 14800, NULL, 'USD', 1, 'active', NULL, 'sand stripe', 'cotton poplin', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:20:15', '2026-08-27 06:20:15'),
+  (63, 3, 28, 'WOM-DRE-MTB4VP07', 'knit-midi-dress', 'Knit Midi Dress', 'LUNA & CO', 'Ribbed merino that skims rather than clings.', 'A ribbed merino-blend midi with long sleeves and a high neck. Warm, quiet and endlessly wearable.', 17500, NULL, 'USD', 2, 'active', NULL, 'oat', 'merino blend', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:20:23', '2026-08-27 06:20:23'),
+  (64, 3, 28, 'WOM-DRE-MTB4VV74', 'floral-tea-dress', 'Floral Tea Dress', 'LUNA & CO', 'A small rose print on soft crepe, cut to swing.', 'Ditsy rose print on drapey crepe with a tiered skirt and a button front. Made for a good afternoon.', 15500, NULL, 'USD', 3, 'active', 'NEW', 'rose print', 'crepe', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:20:31', '2026-08-27 06:20:31'),
+  (65, 3, 29, 'WOM-KNI-MTB4W1CF', 'cashmere-crew', 'Cashmere Crew', 'MAISON EVE', 'Pure cashmere in the grey that goes with everything.', 'Two-ply cashmere with a neat crew neck and ribbed trims. The jumper you will still own in ten years.', 26000, NULL, 'USD', 0, 'active', 'ICON', 'dove grey', 'cashmere', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:20:39', '2026-08-27 06:20:39'),
+  (66, 3, 29, 'WOM-KNI-MTB4W7HQ', 'oversized-cardigan', 'Oversized Cardigan', 'LUNA & CO', 'A big cream cardigan you will steal from yourself.', 'Chunky wool-blend knit with drop shoulders, patch pockets and horn-look buttons. Basically a wearable sofa.', 18500, NULL, 'USD', 1, 'active', NULL, 'cream', 'wool blend', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:20:47', '2026-08-27 06:20:47'),
+  (67, 3, 29, 'WOM-KNI-MTB4WDN7', 'fine-gauge-polo-knit', 'Fine Gauge Polo Knit', 'ATELIER 9', 'A collared knit in sage that reads smart instantly.', 'Cotton-silk in a fine gauge with a short placket and a soft collar. Neat under a blazer.', 13800, NULL, 'USD', 2, 'active', NULL, 'sage', 'cotton silk', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:20:55', '2026-08-27 06:20:55'),
+  (68, 3, 29, 'WOM-KNI-MTB4WJT1', 'cable-knit-vest', 'Cable Knit Vest', 'LUNA & CO', 'Cable lambswool vest for layering over a shirt.', 'A traditional cable knit vest in navy lambswool. Over a white poplin shirt it does a lot of work.', 11800, NULL, 'USD', 3, 'active', NULL, 'navy', 'lambswool', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:21:03', '2026-08-27 06:21:03'),
+  (69, 3, 30, 'WOM-OUT-MTB4WPYF', 'wool-blend-overcoat', 'Wool Blend Overcoat', 'MAISON EVE', 'The camel coat. It ends the outerwear conversation.', 'A single-breasted wool-blend overcoat in camel, cut long and clean with a notch lapel. Works over everything.', 38500, NULL, 'USD', 0, 'active', 'ICON', 'camel', 'wool blend', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:21:11', '2026-08-27 06:21:11'),
+  (70, 3, 30, 'WOM-OUT-MTB4WW3W', 'cropped-blazer', 'Cropped Blazer', 'ATELIER 9', 'A sharp cropped blazer with structure in the shoulder.', 'Wool crepe with a defined shoulder and a cropped body. Sharpens a slip dress or a pair of jeans equally.', 22500, NULL, 'USD', 1, 'active', NULL, 'black', 'wool crepe', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:21:19', '2026-08-27 06:21:19'),
+  (71, 3, 30, 'WOM-OUT-MTB4X298', 'quilted-jacket', 'Quilted Jacket', 'LUNA & CO', 'Diamond-quilted cotton with a corduroy collar.', 'A light quilted jacket in olive with a cord collar and press studs. The one for dog walks and school runs.', 16500, NULL, 'USD', 2, 'active', NULL, 'olive', 'quilted cotton', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:21:27', '2026-08-27 06:21:27'),
+  (72, 3, 30, 'WOM-OUT-MTB4X8EB', 'leather-biker', 'Leather Biker', 'MAISON EVE', 'Lambskin biker with asymmetric zip and real weight.', 'Soft lambskin with an asymmetric zip, notched lapels and zip cuffs. Heavy in the way good leather is.', 44500, NULL, 'USD', 3, 'active', NULL, 'black', 'lambskin', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:21:35', '2026-08-27 06:21:35'),
+  (73, 3, 31, 'WOM-SKI-MTB4XEJJ', 'bias-midi-skirt', 'Bias Midi Skirt', 'MAISON EVE', 'Liquid satin cut on the bias, falls beautifully.', 'A bias-cut satin midi in pewter that moves when you do. One of those pieces that flatters without trying.', 12800, NULL, 'USD', 0, 'active', NULL, 'pewter', 'satin', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:21:43', '2026-08-27 06:21:43'),
+  (74, 3, 31, 'WOM-SKI-MTB4XKOY', 'pleated-midi', 'Pleated Midi', 'LUNA & CO', 'Knife pleats that hold their edge through anything.', 'Permanently pleated recycled polyester in deep forest. Packs flat and comes out sharp.', 11500, NULL, 'USD', 1, 'active', 'NEW', 'forest', 'recycled polyester', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:21:51', '2026-08-27 06:21:51'),
+  (75, 3, 31, 'WOM-SKI-MTB4XQ99', 'denim-mini', 'Denim Mini', 'ATELIER 9', 'A rigid denim mini with a proper A-line.', 'Mid-wash rigid denim in a clean A-line with a five-pocket construction. Ages the way denim should.', 8800, NULL, 'USD', 2, 'active', NULL, 'mid wash', 'cotton denim', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:21:58', '2026-08-27 06:21:58'),
+  (76, 3, 31, 'WOM-SKI-MTB4XVTO', 'tailored-pencil-skirt', 'Tailored Pencil Skirt', 'ATELIER 9', 'Charcoal wool pencil with a back vent that behaves.', 'A knee-length pencil in charcoal wool blend, darted at the waist with a back vent cut for walking.', 13500, NULL, 'USD', 3, 'active', NULL, 'charcoal', 'wool blend', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:22:05', '2026-08-27 06:22:05'),
+  (77, 3, 32, 'WOM-TRO-MTB4Y1Z1', 'wide-leg-trouser', 'Wide Leg Trouser', 'MAISON EVE', 'High-waisted ivory wool with a full, clean leg.', 'Wool crepe with a high waist and a wide straight leg that skims the floor. Quietly dramatic.', 15800, NULL, 'USD', 0, 'active', 'TRENDING', 'ivory', 'wool crepe', NULL, 0, 12, NULL, NULL, 1, '2026-08-27 06:22:13', '2026-08-27 06:22:13'),
+  (78, 3, 32, 'WOM-TRO-MTB4Y84Q', 'straight-jean', 'Straight Jean', 'ATELIER 9', 'Ecru rigid denim, high rise, straight the whole way down.', 'A high-rise straight jean in ecru rigid denim. Structured enough to hold a shape, soft enough to live in.', 12500, NULL, 'USD', 1, 'active', NULL, 'ecru', 'rigid denim', NULL, 0, 19, NULL, NULL, 1, '2026-08-27 06:22:21', '2026-08-27 06:22:21'),
+  (79, 3, 32, 'WOM-TRO-MTB4YEAL', 'tapered-trouser', 'Tapered Trouser', 'LUNA & CO', 'A tapered black trouser with just enough stretch.', 'Stretch twill with a mid rise and a clean taper to the ankle. The trouser for days with a lot in them.', 13200, NULL, 'USD', 2, 'active', NULL, 'black', 'stretch twill', NULL, 0, 26, NULL, NULL, 1, '2026-08-27 06:22:29', '2026-08-27 06:22:29'),
+  (80, 3, 32, 'WOM-TRO-MTB4YKHU', 'linen-drawstring-trouser', 'Linen Drawstring Trouser', 'LUNA & CO', 'Washed linen with a drawstring and no opinions.', 'Soft washed linen in chalk with an elasticated drawstring waist. Holiday trousers that survived the trip home.', 9800, NULL, 'USD', 3, 'active', NULL, 'chalk', 'washed linen', NULL, 0, 33, NULL, NULL, 1, '2026-08-27 06:22:37', '2026-08-27 06:22:37');
+
+-- ------------------------------------------------------------
+-- product_images
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `product_images`;
+CREATE TABLE `product_images` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` int unsigned NOT NULL,
+  `file_path` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'repo-relative, e.g. products/nike-dunk-panda.jpg',
+  `alt_text` varchar(240) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `is_primary` tinyint(1) NOT NULL DEFAULT '0',
+  `width` smallint unsigned DEFAULT NULL,
+  `height` smallint unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_img_prod` (`product_id`,`sort_order`),
+  CONSTRAINT `fk_img_prod` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `product_images` (`id`, `product_id`, `file_path`, `alt_text`, `sort_order`, `is_primary`, `width`, `height`, `created_at`) VALUES
+  (1, 1, 'products/nike-dunk-panda.jpg', 'Dunk Low "Panda" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (2, 2, 'products/nike-af1-a.jpg', 'Air Force 1 \'07 product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (3, 3, 'products/nike-dunk-fog.jpg', 'Dunk Low "Grey Fog" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (4, 4, 'products/nike-kobe6.jpg', 'Kobe 6 "Reverse Grinch" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (5, 5, 'products/aj3-cement.jpg', 'Air Jordan 3 "White Cement" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (6, 6, 'products/aj4-military.jpg', 'Air Jordan 4 "Military Black" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (7, 7, 'products/aj11-cool-grey.jpg', 'Air Jordan 11 "Cool Grey" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (8, 8, 'products/samba-og.jpg', 'Samba OG product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (9, 9, 'products/campus-00s.jpg', 'Campus 00s product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (10, 10, 'products/superstar.jpg', 'Superstar product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (11, 11, 'products/yeezy-350-zebra.jpg', 'Yeezy Boost 350 V2 "Zebra" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (12, 12, 'products/nb-550.jpg', '550 "White Grey" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (13, 13, 'products/nb-2002r-rain.jpg', '2002R "Rain Cloud" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (14, 14, 'products/nb-9060-sea-salt.jpg', '9060 "Sea Salt" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (15, 15, 'products/asics-k14-silver.jpg', 'GEL-Kayano 14 product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (16, 16, 'products/asics-1130.jpg', 'GEL-1130 "Clay Canyon" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (17, 17, 'products/asics-nyc-arctic.jpg', 'GEL-NYC "Arctic Sky" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (18, 18, 'products/asics-nyc-graphite.jpg', 'GEL-NYC "Graphite" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (19, 19, 'products/chuck-classic-hi.jpg', 'Chuck Taylor All Star Hi product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (20, 20, 'products/chuck-70-ox.jpg', 'Chuck 70 Ox "Parchment" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (21, 21, 'products/run-star-hike.jpg', 'Run Star Hike product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (22, 22, 'products/yeezy-foam-rnnr.jpg', 'Yeezy Foam Runner "Onyx" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (23, 23, 'products/nb-530.jpg', 'New Balance 530 product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (24, 24, 'products/asics-1130-black.jpg', 'ASICS GEL-1130 "Black" product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (25, 25, 'products/nb-1906r.jpg', 'New Balance 1906R product photo', 0, 1, NULL, NULL, '2026-08-26 18:50:37'),
+  (26, 33, 'products/apparel/menswear-tees-0.jpg', 'Heavyweight Box Tee product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:04'),
+  (27, 34, 'products/apparel/menswear-tees-1.jpg', 'Long Sleeve Rib Tee product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:13'),
+  (28, 35, 'products/apparel/menswear-tees-2.jpg', 'Pocket Tee product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:20'),
+  (29, 36, 'products/apparel/menswear-tees-3.jpg', 'Striped Crew Tee product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:28'),
+  (30, 37, 'products/apparel/menswear-shirts-0.jpg', 'Oxford Button-Down product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:35'),
+  (31, 38, 'products/apparel/menswear-shirts-1.jpg', 'Camp Collar Shirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:43'),
+  (32, 39, 'products/apparel/menswear-shirts-2.jpg', 'Flannel Overshirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:51'),
+  (33, 40, 'products/apparel/menswear-shirts-3.jpg', 'Denim Western Shirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:16:59'),
+  (34, 41, 'products/apparel/menswear-hoodies-0.jpg', 'Heavy Loopback Hoodie product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:06'),
+  (35, 42, 'products/apparel/menswear-hoodies-1.jpg', 'Zip-Through Hoodie product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:15'),
+  (36, 43, 'products/apparel/menswear-hoodies-2.jpg', 'Crewneck Sweatshirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:23'),
+  (37, 44, 'products/apparel/menswear-hoodies-3.jpg', 'Quarter-Zip Knit product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:31'),
+  (38, 45, 'products/apparel/menswear-jackets-0.jpg', 'Waxed Chore Jacket product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:39'),
+  (39, 46, 'products/apparel/menswear-jackets-1.jpg', 'Bomber Jacket product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:48'),
+  (40, 47, 'products/apparel/menswear-jackets-2.jpg', 'Down Puffer product photo', 0, 1, NULL, NULL, '2026-08-27 06:17:56'),
+  (41, 48, 'products/apparel/menswear-jackets-3.jpg', 'Denim Trucker product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:04'),
+  (42, 49, 'products/apparel/menswear-trousers-0.jpg', 'Straight Leg Jeans product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:12'),
+  (43, 50, 'products/apparel/menswear-trousers-1.jpg', 'Pleated Wide Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:21'),
+  (44, 51, 'products/apparel/menswear-trousers-2.jpg', 'Cargo Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:29'),
+  (45, 52, 'products/apparel/menswear-trousers-3.jpg', 'Wool Suit Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:37'),
+  (46, 53, 'products/apparel/menswear-shorts-0.jpg', 'Pleated Chino Short product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:45'),
+  (47, 54, 'products/apparel/menswear-shorts-1.jpg', 'Jersey Sweat Short product photo', 0, 1, NULL, NULL, '2026-08-27 06:18:53'),
+  (48, 55, 'products/apparel/menswear-shorts-2.jpg', 'Swim Short product photo', 0, 1, NULL, NULL, '2026-08-27 06:19:02'),
+  (49, 56, 'products/apparel/menswear-shorts-3.jpg', 'Denim Short product photo', 0, 1, NULL, NULL, '2026-08-27 06:19:10'),
+  (50, 57, 'products/apparel/womenswear-tops-0.jpg', 'Silk Camisole product photo', 0, 1, NULL, NULL, '2026-08-27 06:19:36');
+INSERT INTO `product_images` (`id`, `product_id`, `file_path`, `alt_text`, `sort_order`, `is_primary`, `width`, `height`, `created_at`) VALUES
+  (51, 58, 'products/apparel/womenswear-tops-1.jpg', 'Ribbed Long Sleeve product photo', 0, 1, NULL, NULL, '2026-08-27 06:19:44'),
+  (52, 59, 'products/apparel/womenswear-tops-2.jpg', 'Poplin Blouse product photo', 0, 1, NULL, NULL, '2026-08-27 06:19:52'),
+  (53, 60, 'products/apparel/womenswear-tops-3.jpg', 'Cropped Knit Tee product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:00'),
+  (54, 61, 'products/apparel/womenswear-dresses-0.jpg', 'Slip Dress product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:08'),
+  (55, 62, 'products/apparel/womenswear-dresses-1.jpg', 'Shirt Dress product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:16'),
+  (56, 63, 'products/apparel/womenswear-dresses-2.jpg', 'Knit Midi Dress product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:24'),
+  (57, 64, 'products/apparel/womenswear-dresses-3.jpg', 'Floral Tea Dress product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:32'),
+  (58, 65, 'products/apparel/womenswear-knitwear-0.jpg', 'Cashmere Crew product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:40'),
+  (59, 66, 'products/apparel/womenswear-knitwear-1.jpg', 'Oversized Cardigan product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:48'),
+  (60, 67, 'products/apparel/womenswear-knitwear-2.jpg', 'Fine Gauge Polo Knit product photo', 0, 1, NULL, NULL, '2026-08-27 06:20:56'),
+  (61, 68, 'products/apparel/womenswear-knitwear-3.jpg', 'Cable Knit Vest product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:04'),
+  (62, 69, 'products/apparel/womenswear-outerwear-0.jpg', 'Wool Blend Overcoat product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:12'),
+  (63, 70, 'products/apparel/womenswear-outerwear-1.jpg', 'Cropped Blazer product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:20'),
+  (64, 71, 'products/apparel/womenswear-outerwear-2.jpg', 'Quilted Jacket product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:28'),
+  (65, 72, 'products/apparel/womenswear-outerwear-3.jpg', 'Leather Biker product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:36'),
+  (66, 73, 'products/apparel/womenswear-skirts-0.jpg', 'Bias Midi Skirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:44'),
+  (67, 74, 'products/apparel/womenswear-skirts-1.jpg', 'Pleated Midi product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:52'),
+  (68, 75, 'products/apparel/womenswear-skirts-2.jpg', 'Denim Mini product photo', 0, 1, NULL, NULL, '2026-08-27 06:21:59'),
+  (69, 76, 'products/apparel/womenswear-skirts-3.jpg', 'Tailored Pencil Skirt product photo', 0, 1, NULL, NULL, '2026-08-27 06:22:06'),
+  (70, 77, 'products/apparel/womenswear-trousers-w-0.jpg', 'Wide Leg Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:22:14'),
+  (71, 78, 'products/apparel/womenswear-trousers-w-1.jpg', 'Straight Jean product photo', 0, 1, NULL, NULL, '2026-08-27 06:22:22'),
+  (72, 79, 'products/apparel/womenswear-trousers-w-2.jpg', 'Tapered Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:22:30'),
+  (73, 80, 'products/apparel/womenswear-trousers-w-3.jpg', 'Linen Drawstring Trouser product photo', 0, 1, NULL, NULL, '2026-08-27 06:22:38');
+
+-- ------------------------------------------------------------
+-- product_variants
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `product_variants`;
+CREATE TABLE `product_variants` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `product_id` int unsigned NOT NULL,
+  `size_label` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `size_system` enum('EU','US','UK','ALPHA','ONE_SIZE') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'EU',
+  `sku` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `stock` int NOT NULL DEFAULT '0',
+  `price_delta_cents` int NOT NULL DEFAULT '0',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_var` (`product_id`,`size_system`,`size_label`),
+  CONSTRAINT `fk_var_prod` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=415 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (1, 1, '40', 'EU', NULL, 7, 0, 0, 1),
+  (2, 1, '41', 'EU', NULL, 9, 0, 1, 1),
+  (3, 1, '42', 'EU', NULL, 11, 0, 2, 1),
+  (4, 1, '43', 'EU', NULL, 4, 0, 3, 1),
+  (5, 1, '44', 'EU', NULL, 6, 0, 4, 1),
+  (6, 1, '45', 'EU', NULL, 8, 0, 5, 1),
+  (7, 2, '40', 'EU', NULL, 7, 0, 0, 1),
+  (8, 2, '41', 'EU', NULL, 9, 0, 1, 1),
+  (9, 2, '42', 'EU', NULL, 11, 0, 2, 1),
+  (10, 2, '43', 'EU', NULL, 4, 0, 3, 1),
+  (11, 2, '44', 'EU', NULL, 6, 0, 4, 1),
+  (12, 2, '45', 'EU', NULL, 8, 0, 5, 1),
+  (13, 3, '40', 'EU', NULL, 7, 0, 0, 1),
+  (14, 3, '41', 'EU', NULL, 9, 0, 1, 1),
+  (15, 3, '42', 'EU', NULL, 11, 0, 2, 1),
+  (16, 3, '43', 'EU', NULL, 4, 0, 3, 1),
+  (17, 3, '44', 'EU', NULL, 6, 0, 4, 1),
+  (18, 3, '45', 'EU', NULL, 8, 0, 5, 1),
+  (19, 4, '40', 'EU', NULL, 7, 0, 0, 1),
+  (20, 4, '41', 'EU', NULL, 9, 0, 1, 1),
+  (21, 4, '42', 'EU', NULL, 11, 0, 2, 1),
+  (22, 4, '43', 'EU', NULL, 4, 0, 3, 1),
+  (23, 4, '44', 'EU', NULL, 6, 0, 4, 1),
+  (24, 4, '45', 'EU', NULL, 8, 0, 5, 1),
+  (25, 5, '40', 'EU', NULL, 7, 0, 0, 1),
+  (26, 5, '41', 'EU', NULL, 9, 0, 1, 1),
+  (27, 5, '42', 'EU', NULL, 11, 0, 2, 1),
+  (28, 5, '43', 'EU', NULL, 4, 0, 3, 1),
+  (29, 5, '44', 'EU', NULL, 6, 0, 4, 1),
+  (30, 5, '45', 'EU', NULL, 8, 0, 5, 1),
+  (31, 6, '40', 'EU', NULL, 7, 0, 0, 1),
+  (32, 6, '41', 'EU', NULL, 9, 0, 1, 1),
+  (33, 6, '42', 'EU', NULL, 11, 0, 2, 1),
+  (34, 6, '43', 'EU', NULL, 4, 0, 3, 1),
+  (35, 6, '44', 'EU', NULL, 6, 0, 4, 1),
+  (36, 6, '45', 'EU', NULL, 8, 0, 5, 1),
+  (37, 7, '40', 'EU', NULL, 7, 0, 0, 1),
+  (38, 7, '41', 'EU', NULL, 9, 0, 1, 1),
+  (39, 7, '42', 'EU', NULL, 11, 0, 2, 1),
+  (40, 7, '43', 'EU', NULL, 4, 0, 3, 1),
+  (41, 7, '44', 'EU', NULL, 6, 0, 4, 1),
+  (42, 7, '45', 'EU', NULL, 8, 0, 5, 1),
+  (43, 8, '40', 'EU', NULL, 7, 0, 0, 1),
+  (44, 8, '41', 'EU', NULL, 9, 0, 1, 1),
+  (45, 8, '42', 'EU', NULL, 11, 0, 2, 1),
+  (46, 8, '43', 'EU', NULL, 4, 0, 3, 1),
+  (47, 8, '44', 'EU', NULL, 6, 0, 4, 1),
+  (48, 8, '45', 'EU', NULL, 8, 0, 5, 1),
+  (49, 9, '40', 'EU', NULL, 7, 0, 0, 1),
+  (50, 9, '41', 'EU', NULL, 9, 0, 1, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (51, 9, '42', 'EU', NULL, 11, 0, 2, 1),
+  (52, 9, '43', 'EU', NULL, 4, 0, 3, 1),
+  (53, 9, '44', 'EU', NULL, 6, 0, 4, 1),
+  (54, 9, '45', 'EU', NULL, 8, 0, 5, 1),
+  (55, 10, '40', 'EU', NULL, 7, 0, 0, 1),
+  (56, 10, '41', 'EU', NULL, 9, 0, 1, 1),
+  (57, 10, '42', 'EU', NULL, 11, 0, 2, 1),
+  (58, 10, '43', 'EU', NULL, 4, 0, 3, 1),
+  (59, 10, '44', 'EU', NULL, 6, 0, 4, 1),
+  (60, 10, '45', 'EU', NULL, 8, 0, 5, 1),
+  (61, 11, '40', 'EU', NULL, 7, 0, 0, 1),
+  (62, 11, '41', 'EU', NULL, 9, 0, 1, 1),
+  (63, 11, '42', 'EU', NULL, 11, 0, 2, 1),
+  (64, 11, '43', 'EU', NULL, 4, 0, 3, 1),
+  (65, 11, '44', 'EU', NULL, 6, 0, 4, 1),
+  (66, 11, '45', 'EU', NULL, 8, 0, 5, 1),
+  (67, 12, '40', 'EU', NULL, 7, 0, 0, 1),
+  (68, 12, '41', 'EU', NULL, 9, 0, 1, 1),
+  (69, 12, '42', 'EU', NULL, 11, 0, 2, 1),
+  (70, 12, '43', 'EU', NULL, 4, 0, 3, 1),
+  (71, 12, '44', 'EU', NULL, 6, 0, 4, 1),
+  (72, 12, '45', 'EU', NULL, 8, 0, 5, 1),
+  (73, 13, '40', 'EU', NULL, 7, 0, 0, 1),
+  (74, 13, '41', 'EU', NULL, 9, 0, 1, 1),
+  (75, 13, '42', 'EU', NULL, 11, 0, 2, 1),
+  (76, 13, '43', 'EU', NULL, 4, 0, 3, 1),
+  (77, 13, '44', 'EU', NULL, 6, 0, 4, 1),
+  (78, 13, '45', 'EU', NULL, 8, 0, 5, 1),
+  (79, 14, '40', 'EU', NULL, 7, 0, 0, 1),
+  (80, 14, '41', 'EU', NULL, 9, 0, 1, 1),
+  (81, 14, '42', 'EU', NULL, 11, 0, 2, 1),
+  (82, 14, '43', 'EU', NULL, 4, 0, 3, 1),
+  (83, 14, '44', 'EU', NULL, 6, 0, 4, 1),
+  (84, 14, '45', 'EU', NULL, 8, 0, 5, 1),
+  (85, 15, '40', 'EU', NULL, 7, 0, 0, 1),
+  (86, 15, '41', 'EU', NULL, 9, 0, 1, 1),
+  (87, 15, '42', 'EU', NULL, 11, 0, 2, 1),
+  (88, 15, '43', 'EU', NULL, 4, 0, 3, 1),
+  (89, 15, '44', 'EU', NULL, 6, 0, 4, 1),
+  (90, 15, '45', 'EU', NULL, 8, 0, 5, 1),
+  (91, 16, '40', 'EU', NULL, 7, 0, 0, 1),
+  (92, 16, '41', 'EU', NULL, 9, 0, 1, 1),
+  (93, 16, '42', 'EU', NULL, 11, 0, 2, 1),
+  (94, 16, '43', 'EU', NULL, 4, 0, 3, 1),
+  (95, 16, '44', 'EU', NULL, 6, 0, 4, 1),
+  (96, 16, '45', 'EU', NULL, 8, 0, 5, 1),
+  (97, 17, '40', 'EU', NULL, 7, 0, 0, 1),
+  (98, 17, '41', 'EU', NULL, 9, 0, 1, 1),
+  (99, 17, '42', 'EU', NULL, 11, 0, 2, 1),
+  (100, 17, '43', 'EU', NULL, 4, 0, 3, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (101, 17, '44', 'EU', NULL, 6, 0, 4, 1),
+  (102, 17, '45', 'EU', NULL, 8, 0, 5, 1),
+  (103, 18, '40', 'EU', NULL, 7, 0, 0, 1),
+  (104, 18, '41', 'EU', NULL, 9, 0, 1, 1),
+  (105, 18, '42', 'EU', NULL, 11, 0, 2, 1),
+  (106, 18, '43', 'EU', NULL, 4, 0, 3, 1),
+  (107, 18, '44', 'EU', NULL, 6, 0, 4, 1),
+  (108, 18, '45', 'EU', NULL, 8, 0, 5, 1),
+  (109, 19, '40', 'EU', NULL, 7, 0, 0, 1),
+  (110, 19, '41', 'EU', NULL, 9, 0, 1, 1),
+  (111, 19, '42', 'EU', NULL, 11, 0, 2, 1),
+  (112, 19, '43', 'EU', NULL, 4, 0, 3, 1),
+  (113, 19, '44', 'EU', NULL, 6, 0, 4, 1),
+  (114, 19, '45', 'EU', NULL, 8, 0, 5, 1),
+  (115, 20, '40', 'EU', NULL, 7, 0, 0, 1),
+  (116, 20, '41', 'EU', NULL, 9, 0, 1, 1),
+  (117, 20, '42', 'EU', NULL, 11, 0, 2, 1),
+  (118, 20, '43', 'EU', NULL, 4, 0, 3, 1),
+  (119, 20, '44', 'EU', NULL, 6, 0, 4, 1),
+  (120, 20, '45', 'EU', NULL, 8, 0, 5, 1),
+  (121, 21, '40', 'EU', NULL, 7, 0, 0, 1),
+  (122, 21, '41', 'EU', NULL, 9, 0, 1, 1),
+  (123, 21, '42', 'EU', NULL, 11, 0, 2, 1),
+  (124, 21, '43', 'EU', NULL, 4, 0, 3, 1),
+  (125, 21, '44', 'EU', NULL, 6, 0, 4, 1),
+  (126, 21, '45', 'EU', NULL, 8, 0, 5, 1),
+  (127, 22, '40', 'EU', NULL, 7, 0, 0, 1),
+  (128, 22, '41', 'EU', NULL, 9, 0, 1, 1),
+  (129, 22, '42', 'EU', NULL, 11, 0, 2, 1),
+  (130, 22, '43', 'EU', NULL, 4, 0, 3, 1),
+  (131, 22, '44', 'EU', NULL, 6, 0, 4, 1),
+  (132, 22, '45', 'EU', NULL, 8, 0, 5, 1),
+  (133, 23, '40', 'EU', NULL, 7, 0, 0, 1),
+  (134, 23, '41', 'EU', NULL, 9, 0, 1, 1),
+  (135, 23, '42', 'EU', NULL, 11, 0, 2, 1),
+  (136, 23, '43', 'EU', NULL, 4, 0, 3, 1),
+  (137, 23, '44', 'EU', NULL, 6, 0, 4, 1),
+  (138, 23, '45', 'EU', NULL, 8, 0, 5, 1),
+  (139, 24, '40', 'EU', NULL, 7, 0, 0, 1),
+  (140, 24, '41', 'EU', NULL, 9, 0, 1, 1),
+  (141, 24, '42', 'EU', NULL, 11, 0, 2, 1),
+  (142, 24, '43', 'EU', NULL, 4, 0, 3, 1),
+  (143, 24, '44', 'EU', NULL, 6, 0, 4, 1),
+  (144, 24, '45', 'EU', NULL, 8, 0, 5, 1),
+  (145, 25, '40', 'EU', NULL, 7, 0, 0, 1),
+  (146, 25, '41', 'EU', NULL, 9, 0, 1, 1),
+  (147, 25, '42', 'EU', NULL, 11, 0, 2, 1),
+  (148, 25, '43', 'EU', NULL, 4, 0, 3, 1),
+  (149, 25, '44', 'EU', NULL, 6, 0, 4, 1),
+  (150, 25, '45', 'EU', NULL, 8, 0, 5, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (151, 33, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (152, 33, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (153, 33, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (154, 33, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (155, 33, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (156, 33, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (157, 34, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (158, 34, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (159, 34, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (160, 34, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (161, 34, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (162, 34, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (163, 35, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (164, 35, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (165, 35, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (166, 35, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (167, 35, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (168, 35, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (169, 36, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (170, 36, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (171, 36, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (172, 36, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (173, 36, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (174, 36, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (175, 37, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (176, 37, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (177, 37, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (178, 37, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (179, 37, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (180, 37, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (181, 38, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (182, 38, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (183, 38, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (184, 38, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (185, 38, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (186, 38, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (187, 39, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (188, 39, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (189, 39, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (190, 39, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (191, 39, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (192, 39, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (193, 40, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (194, 40, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (195, 40, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (196, 40, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (197, 40, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (198, 40, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (199, 41, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (200, 41, 'S', 'ALPHA', NULL, 10, 0, 1, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (201, 41, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (202, 41, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (203, 41, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (204, 41, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (205, 42, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (206, 42, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (207, 42, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (208, 42, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (209, 42, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (210, 42, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (211, 43, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (212, 43, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (213, 43, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (214, 43, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (215, 43, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (216, 43, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (217, 44, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (218, 44, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (219, 44, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (220, 44, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (221, 44, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (222, 44, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (223, 45, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (224, 45, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (225, 45, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (226, 45, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (227, 45, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (228, 45, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (229, 46, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (230, 46, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (231, 46, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (232, 46, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (233, 46, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (234, 46, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (235, 47, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (236, 47, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (237, 47, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (238, 47, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (239, 47, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (240, 47, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (241, 48, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (242, 48, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (243, 48, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (244, 48, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (245, 48, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (246, 48, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (247, 49, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (248, 49, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (249, 49, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (250, 49, 'L', 'ALPHA', NULL, 10, 0, 3, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (251, 49, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (252, 49, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (253, 50, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (254, 50, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (255, 50, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (256, 50, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (257, 50, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (258, 50, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (259, 51, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (260, 51, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (261, 51, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (262, 51, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (263, 51, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (264, 51, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (265, 52, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (266, 52, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (267, 52, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (268, 52, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (269, 52, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (270, 52, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (271, 53, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (272, 53, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (273, 53, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (274, 53, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (275, 53, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (276, 53, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (277, 54, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (278, 54, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (279, 54, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (280, 54, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (281, 54, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (282, 54, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (283, 55, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (284, 55, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (285, 55, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (286, 55, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (287, 55, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (288, 55, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (289, 56, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (290, 56, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (291, 56, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (292, 56, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (293, 56, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (294, 56, 'XXL', 'ALPHA', NULL, 10, 0, 5, 1),
+  (295, 57, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (296, 57, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (297, 57, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (298, 57, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (299, 57, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (300, 58, 'XS', 'ALPHA', NULL, 10, 0, 0, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (301, 58, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (302, 58, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (303, 58, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (304, 58, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (305, 59, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (306, 59, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (307, 59, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (308, 59, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (309, 59, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (310, 60, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (311, 60, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (312, 60, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (313, 60, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (314, 60, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (315, 61, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (316, 61, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (317, 61, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (318, 61, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (319, 61, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (320, 62, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (321, 62, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (322, 62, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (323, 62, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (324, 62, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (325, 63, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (326, 63, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (327, 63, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (328, 63, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (329, 63, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (330, 64, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (331, 64, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (332, 64, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (333, 64, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (334, 64, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (335, 65, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (336, 65, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (337, 65, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (338, 65, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (339, 65, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (340, 66, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (341, 66, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (342, 66, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (343, 66, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (344, 66, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (345, 67, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (346, 67, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (347, 67, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (348, 67, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (349, 67, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (350, 68, 'XS', 'ALPHA', NULL, 10, 0, 0, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (351, 68, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (352, 68, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (353, 68, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (354, 68, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (355, 69, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (356, 69, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (357, 69, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (358, 69, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (359, 69, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (360, 70, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (361, 70, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (362, 70, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (363, 70, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (364, 70, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (365, 71, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (366, 71, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (367, 71, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (368, 71, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (369, 71, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (370, 72, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (371, 72, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (372, 72, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (373, 72, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (374, 72, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (375, 73, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (376, 73, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (377, 73, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (378, 73, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (379, 73, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (380, 74, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (381, 74, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (382, 74, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (383, 74, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (384, 74, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (385, 75, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (386, 75, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (387, 75, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (388, 75, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (389, 75, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (390, 76, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (391, 76, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (392, 76, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (393, 76, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (394, 76, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (395, 77, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (396, 77, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (397, 77, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (398, 77, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (399, 77, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (400, 78, 'XS', 'ALPHA', NULL, 10, 0, 0, 1);
+INSERT INTO `product_variants` (`id`, `product_id`, `size_label`, `size_system`, `sku`, `stock`, `price_delta_cents`, `sort_order`, `is_active`) VALUES
+  (401, 78, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (402, 78, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (403, 78, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (404, 78, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (405, 79, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (406, 79, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (407, 79, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (408, 79, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (409, 79, 'XL', 'ALPHA', NULL, 10, 0, 4, 1),
+  (410, 80, 'XS', 'ALPHA', NULL, 10, 0, 0, 1),
+  (411, 80, 'S', 'ALPHA', NULL, 10, 0, 1, 1),
+  (412, 80, 'M', 'ALPHA', NULL, 10, 0, 2, 1),
+  (413, 80, 'L', 'ALPHA', NULL, 10, 0, 3, 1),
+  (414, 80, 'XL', 'ALPHA', NULL, 10, 0, 4, 1);
+
+-- ------------------------------------------------------------
+-- tags
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `tags`;
+CREATE TABLE `tags` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `kind` enum('style','color','use','material','audience','other') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'other',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `slug` (`slug`)
+) ENGINE=InnoDB AUTO_INCREMENT=202 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `tags` (`id`, `slug`, `name`, `kind`) VALUES
+  (1, 'sneakers', 'Sneakers', 'style'),
+  (2, 'retro', 'Retro', 'style'),
+  (3, 'running', 'Running', 'use'),
+  (4, 'basketball', 'Basketball', 'use'),
+  (5, 'lifestyle', 'Lifestyle', 'use'),
+  (6, 'skate', 'Skate', 'use'),
+  (7, 'white', 'White', 'color'),
+  (8, 'black', 'Black', 'color'),
+  (9, 'grey', 'Grey', 'color'),
+  (10, 'leather', 'Leather', 'material'),
+  (11, 'canvas', 'Canvas', 'material'),
+  (12, 'mesh', 'Mesh', 'material'),
+  (13, 'knit', 'Knit', 'material'),
+  (14, 'suede', 'Suede', 'material'),
+  (15, 'unisex', 'Unisex', 'audience'),
+  (16, 'limited', 'Limited', 'other'),
+  (17, 'classic', 'Classic', 'other'),
+  (18, 'cotton', 'cotton', 'other'),
+  (19, 'basics', 'basics', 'other'),
+  (21, 'oversized', 'oversized', 'other'),
+  (23, 'layering', 'layering', 'other'),
+  (26, 'navy', 'navy', 'other'),
+  (27, 'casual', 'casual', 'other'),
+  (28, 'stripes', 'stripes', 'other'),
+  (32, 'blue', 'blue', 'other'),
+  (33, 'smart', 'smart', 'other'),
+  (34, 'oxford', 'oxford', 'other'),
+  (35, 'linen', 'linen', 'other'),
+  (36, 'summer', 'summer', 'other'),
+  (37, 'beige', 'beige', 'other'),
+  (38, 'flannel', 'flannel', 'other'),
+  (39, 'green', 'green', 'other'),
+  (40, 'check', 'check', 'other'),
+  (42, 'denim', 'denim', 'other'),
+  (43, 'indigo', 'indigo', 'other'),
+  (44, 'western', 'western', 'other'),
+  (47, 'hoodie', 'hoodie', 'other'),
+  (48, 'heavyweight', 'heavyweight', 'other'),
+  (49, 'fleece', 'fleece', 'other'),
+  (51, 'zip', 'zip', 'other'),
+  (55, 'crewneck', 'crewneck', 'other'),
+  (57, 'merino', 'merino', 'other'),
+  (61, 'waxed', 'waxed', 'other'),
+  (62, 'olive', 'olive', 'other'),
+  (63, 'workwear', 'workwear', 'other'),
+  (64, 'jacket', 'jacket', 'other'),
+  (65, 'nylon', 'nylon', 'other'),
+  (67, 'bomber', 'bomber', 'other'),
+  (69, 'down', 'down', 'other'),
+  (71, 'winter', 'winter', 'other');
+INSERT INTO `tags` (`id`, `slug`, `name`, `kind`) VALUES
+  (72, 'puffer', 'puffer', 'other'),
+  (75, 'selvedge', 'selvedge', 'other'),
+  (79, 'jeans', 'jeans', 'other'),
+  (80, 'straight', 'straight', 'other'),
+  (81, 'twill', 'twill', 'other'),
+  (83, 'wide', 'wide', 'other'),
+  (84, 'pleated', 'pleated', 'other'),
+  (85, 'cargo', 'cargo', 'other'),
+  (87, 'utility', 'utility', 'other'),
+  (88, 'ripstop', 'ripstop', 'other'),
+  (89, 'wool', 'wool', 'other'),
+  (90, 'charcoal', 'charcoal', 'other'),
+  (92, 'tailored', 'tailored', 'other'),
+  (93, 'chino', 'chino', 'other'),
+  (94, 'khaki', 'khaki', 'other'),
+  (96, 'shorts', 'shorts', 'other'),
+  (97, 'jersey', 'jersey', 'other'),
+  (99, 'lounge', 'lounge', 'other'),
+  (101, 'swim', 'swim', 'other'),
+  (109, 'silk', 'silk', 'other'),
+  (110, 'cream', 'cream', 'other'),
+  (111, 'evening', 'evening', 'other'),
+  (112, 'camisole', 'camisole', 'other'),
+  (113, 'rib', 'rib', 'other'),
+  (115, 'fitted', 'fitted', 'other'),
+  (119, 'blouse', 'blouse', 'other'),
+  (122, 'yellow', 'yellow', 'other'),
+  (123, 'cropped', 'cropped', 'other'),
+  (127, 'slip', 'slip', 'other'),
+  (129, 'stripe', 'stripe', 'other'),
+  (130, 'shirt-dress', 'shirt-dress', 'other'),
+  (131, 'belted', 'belted', 'other'),
+  (134, 'midi', 'midi', 'other'),
+  (136, 'floral', 'floral', 'other'),
+  (137, 'pink', 'pink', 'other'),
+  (138, 'tea-dress', 'tea-dress', 'other'),
+  (139, 'print', 'print', 'other'),
+  (140, 'cashmere', 'cashmere', 'other'),
+  (143, 'luxury', 'luxury', 'other'),
+  (146, 'cardigan', 'cardigan', 'other'),
+  (150, 'polo', 'polo', 'other'),
+  (154, 'vest', 'vest', 'other'),
+  (155, 'cable', 'cable', 'other'),
+  (157, 'camel', 'camel', 'other'),
+  (158, 'coat', 'coat', 'other'),
+  (162, 'blazer', 'blazer', 'other'),
+  (164, 'quilted', 'quilted', 'other'),
+  (167, 'country', 'country', 'other'),
+  (170, 'biker', 'biker', 'other'),
+  (172, 'satin', 'satin', 'other');
+INSERT INTO `tags` (`id`, `slug`, `name`, `kind`) VALUES
+  (175, 'bias', 'bias', 'other'),
+  (181, 'mini', 'mini', 'other'),
+  (184, 'pencil', 'pencil', 'other'),
+  (188, 'wide-leg', 'wide-leg', 'other'),
+  (196, 'tapered', 'tapered', 'other'),
+  (201, 'relaxed', 'relaxed', 'other');
+
+-- ------------------------------------------------------------
+-- product_tags
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `product_tags`;
+CREATE TABLE `product_tags` (
+  `product_id` int unsigned NOT NULL,
+  `tag_id` int unsigned NOT NULL,
+  `source` enum('human','ai') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'human',
+  PRIMARY KEY (`product_id`,`tag_id`),
+  KEY `fk_pt_tag` (`tag_id`),
+  CONSTRAINT `fk_pt_prod` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_pt_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `product_tags` (`product_id`, `tag_id`, `source`) VALUES
+  (1, 1, 'human'),
+  (1, 7, 'human'),
+  (1, 8, 'human'),
+  (2, 1, 'human'),
+  (2, 7, 'human'),
+  (3, 1, 'human'),
+  (3, 7, 'human'),
+  (3, 9, 'human'),
+  (3, 10, 'human'),
+  (4, 1, 'human'),
+  (5, 1, 'human'),
+  (5, 7, 'human'),
+  (6, 1, 'human'),
+  (6, 7, 'human'),
+  (6, 8, 'human'),
+  (7, 1, 'human'),
+  (7, 9, 'human'),
+  (7, 10, 'human'),
+  (8, 1, 'human'),
+  (8, 7, 'human'),
+  (8, 10, 'human'),
+  (8, 17, 'human'),
+  (9, 1, 'human'),
+  (9, 6, 'human'),
+  (9, 14, 'human'),
+  (10, 1, 'human'),
+  (11, 1, 'human'),
+  (11, 13, 'human'),
+  (12, 1, 'human'),
+  (12, 4, 'human'),
+  (12, 7, 'human'),
+  (12, 9, 'human'),
+  (13, 1, 'human'),
+  (13, 9, 'human'),
+  (14, 1, 'human'),
+  (14, 17, 'human'),
+  (15, 1, 'human'),
+  (15, 3, 'human'),
+  (15, 7, 'human'),
+  (15, 12, 'human'),
+  (16, 1, 'human'),
+  (16, 2, 'human'),
+  (17, 1, 'human'),
+  (18, 1, 'human'),
+  (18, 9, 'human'),
+  (19, 1, 'human'),
+  (19, 11, 'human'),
+  (20, 1, 'human'),
+  (20, 11, 'human'),
+  (21, 1, 'human');
+INSERT INTO `product_tags` (`product_id`, `tag_id`, `source`) VALUES
+  (22, 1, 'human'),
+  (23, 1, 'human'),
+  (23, 2, 'human'),
+  (24, 1, 'human'),
+  (24, 8, 'human'),
+  (25, 1, 'human'),
+  (33, 7, 'ai'),
+  (33, 18, 'ai'),
+  (33, 19, 'ai'),
+  (33, 21, 'ai'),
+  (34, 9, 'ai'),
+  (34, 18, 'ai'),
+  (34, 23, 'ai'),
+  (35, 18, 'ai'),
+  (35, 26, 'ai'),
+  (35, 27, 'ai'),
+  (36, 18, 'ai'),
+  (36, 27, 'ai'),
+  (36, 28, 'ai'),
+  (37, 18, 'ai'),
+  (37, 32, 'ai'),
+  (37, 33, 'ai'),
+  (37, 34, 'ai'),
+  (38, 35, 'ai'),
+  (38, 36, 'ai'),
+  (38, 37, 'ai'),
+  (39, 23, 'ai'),
+  (39, 38, 'ai'),
+  (39, 39, 'ai'),
+  (39, 40, 'ai'),
+  (40, 42, 'ai'),
+  (40, 43, 'ai'),
+  (40, 44, 'ai'),
+  (41, 9, 'ai'),
+  (41, 18, 'ai'),
+  (41, 47, 'ai'),
+  (41, 48, 'ai'),
+  (42, 8, 'ai'),
+  (42, 47, 'ai'),
+  (42, 49, 'ai'),
+  (42, 51, 'ai'),
+  (43, 18, 'ai'),
+  (43, 19, 'ai'),
+  (43, 37, 'ai'),
+  (43, 55, 'ai'),
+  (44, 13, 'ai'),
+  (44, 26, 'ai'),
+  (44, 33, 'ai'),
+  (44, 57, 'ai'),
+  (45, 61, 'ai');
+INSERT INTO `product_tags` (`product_id`, `tag_id`, `source`) VALUES
+  (45, 62, 'ai'),
+  (45, 63, 'ai'),
+  (45, 64, 'ai'),
+  (46, 8, 'ai'),
+  (46, 64, 'ai'),
+  (46, 65, 'ai'),
+  (46, 67, 'ai'),
+  (47, 9, 'ai'),
+  (47, 69, 'ai'),
+  (47, 71, 'ai'),
+  (47, 72, 'ai'),
+  (48, 42, 'ai'),
+  (48, 43, 'ai'),
+  (48, 64, 'ai'),
+  (48, 75, 'ai'),
+  (49, 32, 'ai'),
+  (49, 42, 'ai'),
+  (49, 79, 'ai'),
+  (49, 80, 'ai'),
+  (50, 37, 'ai'),
+  (50, 81, 'ai'),
+  (50, 83, 'ai'),
+  (50, 84, 'ai'),
+  (51, 8, 'ai'),
+  (51, 85, 'ai'),
+  (51, 87, 'ai'),
+  (51, 88, 'ai'),
+  (52, 33, 'ai'),
+  (52, 89, 'ai'),
+  (52, 90, 'ai'),
+  (52, 92, 'ai'),
+  (53, 36, 'ai'),
+  (53, 93, 'ai'),
+  (53, 94, 'ai'),
+  (53, 96, 'ai'),
+  (54, 9, 'ai'),
+  (54, 96, 'ai'),
+  (54, 97, 'ai'),
+  (54, 99, 'ai'),
+  (55, 32, 'ai'),
+  (55, 36, 'ai'),
+  (55, 65, 'ai'),
+  (55, 101, 'ai'),
+  (56, 32, 'ai'),
+  (56, 36, 'ai'),
+  (56, 42, 'ai'),
+  (56, 96, 'ai'),
+  (57, 109, 'ai'),
+  (57, 110, 'ai'),
+  (57, 111, 'ai');
+INSERT INTO `product_tags` (`product_id`, `tag_id`, `source`) VALUES
+  (57, 112, 'ai'),
+  (58, 8, 'ai'),
+  (58, 23, 'ai'),
+  (58, 113, 'ai'),
+  (58, 115, 'ai'),
+  (59, 7, 'ai'),
+  (59, 18, 'ai'),
+  (59, 33, 'ai'),
+  (59, 119, 'ai'),
+  (60, 13, 'ai'),
+  (60, 122, 'ai'),
+  (60, 123, 'ai'),
+  (61, 26, 'ai'),
+  (61, 109, 'ai'),
+  (61, 111, 'ai'),
+  (61, 127, 'ai'),
+  (62, 18, 'ai'),
+  (62, 129, 'ai'),
+  (62, 130, 'ai'),
+  (62, 131, 'ai'),
+  (63, 13, 'ai'),
+  (63, 37, 'ai'),
+  (63, 57, 'ai'),
+  (63, 134, 'ai'),
+  (64, 136, 'ai'),
+  (64, 137, 'ai'),
+  (64, 138, 'ai'),
+  (64, 139, 'ai'),
+  (65, 9, 'ai'),
+  (65, 13, 'ai'),
+  (65, 140, 'ai'),
+  (65, 143, 'ai'),
+  (66, 21, 'ai'),
+  (66, 89, 'ai'),
+  (66, 110, 'ai'),
+  (66, 146, 'ai'),
+  (67, 13, 'ai'),
+  (67, 33, 'ai'),
+  (67, 39, 'ai'),
+  (67, 150, 'ai'),
+  (68, 26, 'ai'),
+  (68, 89, 'ai'),
+  (68, 154, 'ai'),
+  (68, 155, 'ai'),
+  (69, 89, 'ai'),
+  (69, 92, 'ai'),
+  (69, 157, 'ai'),
+  (69, 158, 'ai'),
+  (70, 8, 'ai'),
+  (70, 89, 'ai');
+INSERT INTO `product_tags` (`product_id`, `tag_id`, `source`) VALUES
+  (70, 92, 'ai'),
+  (70, 162, 'ai'),
+  (71, 62, 'ai'),
+  (71, 64, 'ai'),
+  (71, 164, 'ai'),
+  (71, 167, 'ai'),
+  (72, 8, 'ai'),
+  (72, 10, 'ai'),
+  (72, 64, 'ai'),
+  (72, 170, 'ai'),
+  (73, 9, 'ai'),
+  (73, 134, 'ai'),
+  (73, 172, 'ai'),
+  (73, 175, 'ai'),
+  (74, 39, 'ai'),
+  (74, 84, 'ai'),
+  (74, 134, 'ai'),
+  (75, 32, 'ai'),
+  (75, 42, 'ai'),
+  (75, 181, 'ai'),
+  (76, 33, 'ai'),
+  (76, 89, 'ai'),
+  (76, 90, 'ai'),
+  (76, 184, 'ai'),
+  (77, 89, 'ai'),
+  (77, 92, 'ai'),
+  (77, 110, 'ai'),
+  (77, 188, 'ai'),
+  (78, 42, 'ai'),
+  (78, 79, 'ai'),
+  (78, 80, 'ai'),
+  (78, 110, 'ai'),
+  (79, 8, 'ai'),
+  (79, 33, 'ai'),
+  (79, 81, 'ai'),
+  (79, 196, 'ai'),
+  (80, 7, 'ai'),
+  (80, 35, 'ai'),
+  (80, 36, 'ai'),
+  (80, 201, 'ai');
+
+-- ------------------------------------------------------------
+-- product_search
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `product_search`;
+CREATE TABLE `product_search` (
+  `product_id` int unsigned NOT NULL,
+  `content` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `embedding_json` json DEFAULT NULL,
+  `image_vec_json` json DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`product_id`),
+  FULLTEXT KEY `ft_search` (`content`),
+  CONSTRAINT `fk_ps_prod` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `product_search` (`product_id`, `content`, `embedding_json`, `image_vec_json`, `updated_at`) VALUES
+  (1, 'Dunk Low "Panda" Nike Nike Sneakers White Black The black-and-white staple that refuses to stay in stock. Goes with everything you own. The black-and-white staple that refuses to stay in stock. Goes with everything you own.', NULL, NULL, '2026-08-27 06:22:51'),
+  (2, 'Air Force 1 \'07 Nike Nike Sneakers White Triple white. The most worn sneaker on planet Earth, and still undefeated. Triple white. The most worn sneaker on planet Earth, and still undefeated.', NULL, NULL, '2026-08-27 06:22:52'),
+  (3, 'Dunk Low "Grey Fog" Nike Nike Sneakers White Grey Leather Soft grey overlays on crisp white leather. The Panda\'s calmer sibling. Soft grey overlays on crisp white leather. The Panda\'s calmer sibling.', NULL, NULL, '2026-08-27 06:22:52'),
+  (4, 'Kobe 6 "Reverse Grinch" Nike Nike Sneakers Christmas-day energy all year. Sharp, fast, and impossible to miss on court. Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', NULL, NULL, '2026-08-27 06:22:53'),
+  (5, 'Air Jordan 3 "White Cement" Jordan Jordan Sneakers White Elephant print, visible Air, and history in every step. The \'88 icon reimagined. Elephant print, visible Air, and history in every step. The \'88 icon reimagined.', NULL, NULL, '2026-08-27 06:22:53'),
+  (6, 'Air Jordan 4 "Military Black" Jordan Jordan Sneakers White Black Clean white base, black hits, endless outfit rotation. A modern-day essential. Clean white base, black hits, endless outfit rotation. A modern-day essential.', NULL, NULL, '2026-08-27 06:22:54'),
+  (7, 'Air Jordan 11 "Cool Grey" Jordan Jordan Sneakers Grey Leather Patent leather shine in signature Cool Grey. Dress code approved, court certified. Patent leather shine in signature Cool Grey. Dress code approved, court certified.', NULL, NULL, '2026-08-27 06:22:54'),
+  (8, 'Samba OG adidas adidas Sneakers White Leather Classic Terrace classic turned global fashion staple. White leather, gum sole, done. Terrace classic turned global fashion staple. White leather, gum sole, done.', NULL, NULL, '2026-08-27 06:22:55'),
+  (9, 'Campus 00s adidas adidas Sneakers Skate Suede Chunky Y2K proportions with premium suede. The skate-shop look, revived. Chunky Y2K proportions with premium suede. The skate-shop look, revived.', NULL, NULL, '2026-08-27 06:22:55'),
+  (10, 'Superstar adidas adidas Sneakers Shell toe. Three stripes. Fifty years of street cred in one silhouette. Shell toe. Three stripes. Fifty years of street cred in one silhouette.', NULL, NULL, '2026-08-27 06:22:56'),
+  (11, 'Yeezy Boost 350 V2 "Zebra" adidas adidas Sneakers Knit The unmistakable stripe pattern on Primeknit, riding full-length Boost. The unmistakable stripe pattern on Primeknit, riding full-length Boost.', NULL, NULL, '2026-08-27 06:22:56'),
+  (12, '550 "White Grey" New Balance New Balance Sneakers Basketball White Grey The \'89 basketball shape that took over the streets. Perfectly aged proportions. The \'89 basketball shape that took over the streets. Perfectly aged proportions.', NULL, NULL, '2026-08-27 06:22:57'),
+  (13, '2002R "Rain Cloud" New Balance New Balance Sneakers Grey Protection Pack construction with soft layered greys. Comfort with edge. Protection Pack construction with soft layered greys. Comfort with edge.', NULL, NULL, '2026-08-27 06:22:58'),
+  (14, '9060 "Sea Salt" New Balance New Balance Sneakers Classic Warped lines and creamy tones — a futurist remix of the classic 99X series. Warped lines and creamy tones — a futurist remix of the classic 99X series.', NULL, NULL, '2026-08-27 06:22:58'),
+  (15, 'GEL-Kayano 14 ASICS ASICS Sneakers Running White Mesh Y2K running tech turned runway favorite. White and pure silver mesh magic. Y2K running tech turned runway favorite. White and pure silver mesh magic.', NULL, NULL, '2026-08-27 06:23:00'),
+  (16, 'GEL-1130 "Clay Canyon" ASICS ASICS Sneakers Retro Retro runner DNA with modern comfort. The quiet flex of people who know. Retro runner DNA with modern comfort. The quiet flex of people who know.', NULL, NULL, '2026-08-27 06:23:01'),
+  (17, 'GEL-NYC "Arctic Sky" ASICS ASICS Sneakers Layered cream and icy blue inspired by early-2000s city marathons. Layered cream and icy blue inspired by early-2000s city marathons.', NULL, NULL, '2026-08-27 06:23:01'),
+  (18, 'GEL-NYC "Graphite" ASICS ASICS Sneakers Grey Tonal grey stack with reflective hits. Urban camouflage, elevated. Tonal grey stack with reflective hits. Urban camouflage, elevated.', NULL, NULL, '2026-08-27 06:23:02'),
+  (19, 'Chuck Taylor All Star Hi Converse Converse Sneakers Canvas The canvas high-top that started it all. Every generation makes it theirs. The canvas high-top that started it all. Every generation makes it theirs.', NULL, NULL, '2026-08-27 06:23:03'),
+  (20, 'Chuck 70 Ox "Parchment" Converse Converse Sneakers Canvas Vintage-spec construction, warmer canvas, higher foxing. The connoisseur\'s Chuck. Vintage-spec construction, warmer canvas, higher foxing. The connoisseur\'s Chuck.', NULL, NULL, '2026-08-27 06:23:03'),
+  (21, 'Run Star Hike Converse Converse Sneakers The Chuck on a platform lugged sole. Height, attitude, and grip included. The Chuck on a platform lugged sole. Height, attitude, and grip included.', NULL, NULL, '2026-08-27 06:23:04'),
+  (22, 'Yeezy Foam Runner "Onyx" adidas adidas Sneakers Sculptural one-piece foam. Feels like walking on the moon, priced like Earth. Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.', NULL, NULL, '2026-08-27 06:22:57'),
+  (23, 'New Balance 530 New Balance New Balance Sneakers Retro Silvery retro runner with everyday comfort. Last sizes going fast. Silvery retro runner with everyday comfort. Last sizes going fast.', NULL, NULL, '2026-08-27 06:22:59'),
+  (24, 'ASICS GEL-1130 "Black" ASICS ASICS Sneakers Black The stealth colorway of the fan favorite. Discounted, not discontinued. The stealth colorway of the fan favorite. Discounted, not discontinued.', NULL, NULL, '2026-08-27 06:23:02'),
+  (25, 'New Balance 1906R New Balance New Balance Sneakers Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price. Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.', NULL, NULL, '2026-08-27 06:23:00'),
+  (33, 'Heavyweight Box Tee NORTHLINE T-Shirts off-white 240gsm cotton White cotton basics oversized A tee with enough weight to hold its shape through a hundred washes. Boxy 240gsm cotton with a ribbed collar that will not curl. The one you reach for when you have not thought about it.', NULL, NULL, '2026-08-27 06:16:10'),
+  (34, 'Long Sleeve Rib Tee NORTHLINE T-Shirts charcoal ribbed cotton Grey cotton layering Ribbed cotton that hugs the arms and stays put under a jacket. A slim ribbed long sleeve in deep charcoal. Layers flat under knitwear and looks deliberate on its own.', NULL, NULL, '2026-08-27 06:16:18'),
+  (35, 'Pocket Tee ATELIER 9 T-Shirts washed navy garment-dyed cotton cotton navy casual Garment-dyed navy with a chest pocket that actually holds things. Washed after dyeing so it arrives already soft and slightly faded. The pocket is reinforced, not decorative.', NULL, NULL, '2026-08-27 06:16:25'),
+  (36, 'Striped Crew Tee ATELIER 9 T-Shirts ecru / black cotton jersey cotton casual stripes Wide breton stripes on a relaxed crew — quietly nautical. Ecru and black stripes on soft jersey with a relaxed body. Works with denim, works with tailoring.', NULL, NULL, '2026-08-27 06:16:33'),
+  (37, 'Oxford Button-Down NORTHLINE Shirts pale blue cotton oxford cotton blue smart oxford The pale blue oxford. Nothing here is more useful. Woven oxford cotton with a soft roll to the collar. Smart enough for a meeting, forgiving enough for a Sunday.', NULL, NULL, '2026-08-27 06:16:41'),
+  (38, 'Camp Collar Shirt KADENCE Shirts sand linen blend linen summer beige Open collar, linen blend, built for heat. A relaxed camp collar in a breathable linen blend. Wear it open over a tee when the afternoon gets serious.', NULL, NULL, '2026-08-27 06:16:48'),
+  (39, 'Flannel Overshirt KADENCE Shirts forest check brushed cotton flannel layering flannel green check Thick enough to count as a jacket in September. Brushed cotton flannel in a forest check, cut long with a chest pocket. Half shirt, half light jacket.', NULL, NULL, '2026-08-27 06:16:57'),
+  (40, 'Denim Western Shirt ATELIER 9 Shirts mid indigo cotton denim denim indigo western Snap buttons, pointed yokes, proper indigo. A western-cut denim shirt in mid indigo that fades where you bend. Snaps, not buttons — as it should be.', NULL, NULL, '2026-08-27 06:17:04'),
+  (41, 'Heavy Loopback Hoodie NORTHLINE Hoodies & Sweats heather grey loopback cotton Grey cotton hoodie heavyweight Loopback cotton with a hood that actually stands up. Dense loopback cotton, double-lined hood, ribbed cuffs that keep their grip. It gets better the more you wear it.', NULL, NULL, '2026-08-27 06:17:12'),
+  (42, 'Zip-Through Hoodie NORTHLINE Hoodies & Sweats black brushed fleece Black hoodie fleece zip Full-zip brushed fleece for the ten degrees either side of comfortable. Brushed back fleece with a full metal zip and deep hand pockets. The layer you take off and put back on all day.', NULL, NULL, '2026-08-27 06:17:21'),
+  (43, 'Crewneck Sweatshirt ATELIER 9 Hoodies & Sweats oat cotton fleece cotton basics beige crewneck A plain oat crewneck — the least complicated thing you own. Mid-weight cotton fleece with a V-insert at the collar so it holds shape. No logo, no message, no fuss.', NULL, NULL, '2026-08-27 06:17:29'),
+  (44, 'Quarter-Zip Knit KADENCE Hoodies & Sweats navy merino blend Knit navy smart merino Merino blend quarter-zip that passes for smart. A fine-gauge merino blend with a short placket zip. Warmer than it looks and neat enough for the office.', NULL, NULL, '2026-08-27 06:17:37'),
+  (45, 'Waxed Chore Jacket KADENCE Jackets olive waxed cotton waxed olive workwear jacket Waxed cotton, four pockets, ages like it owes you money. A workwear chore coat in waxed olive cotton with four square pockets. Sheds a shower and earns its creases.', NULL, NULL, '2026-08-27 06:17:45'),
+  (46, 'Bomber Jacket NORTHLINE Jackets black technical nylon Black jacket nylon bomber Clean black nylon bomber with ribbed trims. A slim technical nylon bomber with ribbed collar, cuffs and hem. Nothing extra, which is the point.', NULL, NULL, '2026-08-27 06:17:53'),
+  (47, 'Down Puffer NORTHLINE Jackets slate recycled down Grey down winter puffer Baffled down that packs into its own pocket. Recycled down in horizontal baffles with a matte slate shell. Genuinely warm, and it folds into the chest pocket.', NULL, NULL, '2026-08-27 06:18:02'),
+  (48, 'Denim Trucker ATELIER 9 Jackets rigid indigo selvedge denim denim indigo jacket selvedge Rigid selvedge trucker that fades to your shape. Unwashed selvedge denim in a classic trucker cut. Stiff for a month, then permanently yours.', NULL, NULL, '2026-08-27 06:18:10'),
+  (49, 'Straight Leg Jeans ATELIER 9 Trousers mid wash cotton denim blue denim jeans straight A straight leg that is neither skinny nor a tent. Mid-wash denim with a straight leg and a mid rise. The proportion most people actually want.', NULL, NULL, '2026-08-27 06:18:18'),
+  (50, 'Pleated Wide Trouser KADENCE Trousers stone cotton twill beige twill wide pleated Single-pleat twill with room through the thigh. A single pleat and a wide straight leg in stone cotton twill. Drapes properly instead of clinging.', NULL, NULL, '2026-08-27 06:18:26'),
+  (51, 'Cargo Trouser NORTHLINE Trousers black ripstop cotton Black cargo utility ripstop Ripstop cargos with pockets sized for real objects. Black ripstop with bellowed thigh pockets and a drawcord hem. Utility that does not read as costume.', NULL, NULL, '2026-08-27 06:18:35'),
+  (52, 'Wool Suit Trouser KADENCE Trousers charcoal wool blend smart wool charcoal tailored Charcoal wool that behaves at a wedding. A tapered wool-blend trouser in charcoal with a clean front. Wears with the jacket or entirely without it.', NULL, NULL, '2026-08-27 06:18:43'),
+  (53, 'Pleated Chino Short KADENCE Shorts khaki cotton twill summer chino khaki shorts A 7-inch pleated chino short that is not trying too hard. Khaki cotton twill with a single pleat and a seven-inch inseam. Long enough to sit down in.', NULL, NULL, '2026-08-27 06:18:51'),
+  (54, 'Jersey Sweat Short NORTHLINE Shorts heather grey cotton jersey Grey shorts jersey lounge Grey sweat shorts, elastic waist, zero ambition. Loopback jersey with an elastic drawcord waist and side pockets. Made for doing very little.', NULL, NULL, '2026-08-27 06:18:59'),
+  (55, 'Swim Short ATELIER 9 Shorts sea blue recycled nylon blue summer nylon swim Quick-dry nylon in a blue worth swimming in. Recycled nylon that dries on the walk back, with a mesh liner and a zip back pocket.', NULL, NULL, '2026-08-27 06:19:08'),
+  (56, 'Denim Short ATELIER 9 Shorts light wash cotton denim blue summer denim shorts Cut-off denim with a turned hem, done properly. Light wash denim with a fixed turn-up hem so it keeps its line. Fades with the summer.', NULL, NULL, '2026-08-27 06:19:16'),
+  (57, 'Silk Camisole MAISON EVE Tops champagne washable silk silk cream evening camisole Bias-cut silk that catches the light and forgives dinner. Washable silk cut on the bias with adjustable straps. Dresses up under a blazer, dresses down over denim.', NULL, NULL, '2026-08-27 06:19:42');
+INSERT INTO `product_search` (`product_id`, `content`, `embedding_json`, `image_vec_json`, `updated_at`) VALUES
+  (58, 'Ribbed Long Sleeve MAISON EVE Tops black stretch rib Black layering rib fitted A second-skin rib that holds its shape all day. Fine stretch rib with a high neck and long sleeves. The layering piece you will buy twice.', NULL, NULL, '2026-08-27 06:19:50'),
+  (59, 'Poplin Blouse ATELIER 9 Tops white cotton poplin White cotton smart blouse Crisp white poplin with volume in the sleeve. Cotton poplin with a gathered shoulder and a covered placket. Sharp with tailoring, easy with jeans.', NULL, NULL, '2026-08-27 06:19:58'),
+  (60, 'Cropped Knit Tee LUNA & CO Tops butter yellow cotton knit Knit yellow cropped A short knit tee in a yellow that lifts everything. Fine cotton knit with a cropped body and a rolled hem. Sits exactly at the waistband of a high trouser.', NULL, NULL, '2026-08-27 06:20:05'),
+  (61, 'Slip Dress MAISON EVE Dresses ink navy washable silk navy silk evening slip The bias slip that goes anywhere after 6pm. Bias-cut washable silk in ink navy with a cowl neck. Wears alone in summer, over a rib tee in winter.', NULL, NULL, '2026-08-27 06:20:14'),
+  (62, 'Shirt Dress ATELIER 9 Dresses sand stripe cotton poplin cotton stripe shirt-dress belted A belted shirt dress that solves whole mornings. Striped cotton poplin with a self belt and a collar that sits open or closed. One decision, done.', NULL, NULL, '2026-08-27 06:20:22'),
+  (63, 'Knit Midi Dress LUNA & CO Dresses oat merino blend Knit beige merino midi Ribbed merino that skims rather than clings. A ribbed merino-blend midi with long sleeves and a high neck. Warm, quiet and endlessly wearable.', NULL, NULL, '2026-08-27 06:20:30'),
+  (64, 'Floral Tea Dress LUNA & CO Dresses rose print crepe floral pink tea-dress print A small rose print on soft crepe, cut to swing. Ditsy rose print on drapey crepe with a tiered skirt and a button front. Made for a good afternoon.', NULL, NULL, '2026-08-27 06:20:38'),
+  (65, 'Cashmere Crew MAISON EVE Knitwear dove grey cashmere Grey Knit cashmere luxury Pure cashmere in the grey that goes with everything. Two-ply cashmere with a neat crew neck and ribbed trims. The jumper you will still own in ten years.', NULL, NULL, '2026-08-27 06:20:45'),
+  (66, 'Oversized Cardigan LUNA & CO Knitwear cream wool blend oversized wool cream cardigan A big cream cardigan you will steal from yourself. Chunky wool-blend knit with drop shoulders, patch pockets and horn-look buttons. Basically a wearable sofa.', NULL, NULL, '2026-08-27 06:20:53'),
+  (67, 'Fine Gauge Polo Knit ATELIER 9 Knitwear sage cotton silk Knit smart green polo A collared knit in sage that reads smart instantly. Cotton-silk in a fine gauge with a short placket and a soft collar. Neat under a blazer.', NULL, NULL, '2026-08-27 06:21:01'),
+  (68, 'Cable Knit Vest LUNA & CO Knitwear navy lambswool navy wool vest cable Cable lambswool vest for layering over a shirt. A traditional cable knit vest in navy lambswool. Over a white poplin shirt it does a lot of work.', NULL, NULL, '2026-08-27 06:21:09'),
+  (69, 'Wool Blend Overcoat MAISON EVE Jackets & Coats camel wool blend wool tailored camel coat The camel coat. It ends the outerwear conversation. A single-breasted wool-blend overcoat in camel, cut long and clean with a notch lapel. Works over everything.', NULL, NULL, '2026-08-27 06:21:17'),
+  (70, 'Cropped Blazer ATELIER 9 Jackets & Coats black wool crepe Black wool tailored blazer A sharp cropped blazer with structure in the shoulder. Wool crepe with a defined shoulder and a cropped body. Sharpens a slip dress or a pair of jeans equally.', NULL, NULL, '2026-08-27 06:21:25'),
+  (71, 'Quilted Jacket LUNA & CO Jackets & Coats olive quilted cotton olive jacket quilted country Diamond-quilted cotton with a corduroy collar. A light quilted jacket in olive with a cord collar and press studs. The one for dog walks and school runs.', NULL, NULL, '2026-08-27 06:21:33'),
+  (72, 'Leather Biker MAISON EVE Jackets & Coats black lambskin Black Leather jacket biker Lambskin biker with asymmetric zip and real weight. Soft lambskin with an asymmetric zip, notched lapels and zip cuffs. Heavy in the way good leather is.', NULL, NULL, '2026-08-27 06:21:41'),
+  (73, 'Bias Midi Skirt MAISON EVE Skirts pewter satin Grey midi satin bias Liquid satin cut on the bias, falls beautifully. A bias-cut satin midi in pewter that moves when you do. One of those pieces that flatters without trying.', NULL, NULL, '2026-08-27 06:21:49'),
+  (74, 'Pleated Midi LUNA & CO Skirts forest recycled polyester green pleated midi Knife pleats that hold their edge through anything. Permanently pleated recycled polyester in deep forest. Packs flat and comes out sharp.', NULL, NULL, '2026-08-27 06:21:56'),
+  (75, 'Denim Mini ATELIER 9 Skirts mid wash cotton denim blue denim mini A rigid denim mini with a proper A-line. Mid-wash rigid denim in a clean A-line with a five-pocket construction. Ages the way denim should.', NULL, NULL, '2026-08-27 06:22:04'),
+  (76, 'Tailored Pencil Skirt ATELIER 9 Skirts charcoal wool blend smart wool charcoal pencil Charcoal wool pencil with a back vent that behaves. A knee-length pencil in charcoal wool blend, darted at the waist with a back vent cut for walking.', NULL, NULL, '2026-08-27 06:22:12'),
+  (77, 'Wide Leg Trouser MAISON EVE Trousers ivory wool crepe wool tailored cream wide-leg High-waisted ivory wool with a full, clean leg. Wool crepe with a high waist and a wide straight leg that skims the floor. Quietly dramatic.', NULL, NULL, '2026-08-27 06:22:20'),
+  (78, 'Straight Jean ATELIER 9 Trousers ecru rigid denim denim jeans straight cream Ecru rigid denim, high rise, straight the whole way down. A high-rise straight jean in ecru rigid denim. Structured enough to hold a shape, soft enough to live in.', NULL, NULL, '2026-08-27 06:22:28'),
+  (79, 'Tapered Trouser LUNA & CO Trousers black stretch twill Black smart twill tapered A tapered black trouser with just enough stretch. Stretch twill with a mid rise and a clean taper to the ankle. The trouser for days with a lot in them.', NULL, NULL, '2026-08-27 06:22:36'),
+  (80, 'Linen Drawstring Trouser LUNA & CO Trousers chalk washed linen White linen summer relaxed Washed linen with a drawstring and no opinions. Soft washed linen in chalk with an elasticated drawstring waist. Holiday trousers that survived the trip home.', NULL, NULL, '2026-08-27 06:22:44');
+
+-- ------------------------------------------------------------
+-- highlights
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `highlights`;
+CREATE TABLE `highlights` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `space_id` int unsigned NOT NULL,
+  `code` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'sale | popular | new_arrival | custom-*',
+  `title` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'text shown on the island sign',
+  `subtitle` varchar(160) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `accent_color` char(7) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#ff2d55',
+  `is_active` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'only one active per space',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hl_code` (`space_id`,`code`),
+  CONSTRAINT `fk_hl_space` FOREIGN KEY (`space_id`) REFERENCES `spaces` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `highlights` (`id`, `space_id`, `code`, `title`, `subtitle`, `accent_color`, `is_active`, `sort_order`, `created_at`, `updated_at`) VALUES
+  (1, 1, 'sale', 'SALE %', 'Marked down while stock lasts', '#ff2d55', 1, 0, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (2, 1, 'popular', 'POPULAR', 'What everyone is buying', '#ffd166', 0, 1, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (3, 1, 'new_arrival', 'NEW ARRIVALS', 'Fresh on the shelves', '#3ddc84', 0, 2, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (4, 2, 'new-in', 'NEW IN', 'Fresh on the rails this week', '#4cc9f0', 1, 0, '2026-08-27 06:19:17', '2026-08-27 06:19:19'),
+  (5, 3, 'new-in', 'NEW IN', 'Just landed this week', '#ff7ab6', 1, 0, '2026-08-27 06:22:45', '2026-08-27 06:22:46');
+
+-- ------------------------------------------------------------
+-- highlight_items
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `highlight_items`;
+CREATE TABLE `highlight_items` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `highlight_id` int unsigned NOT NULL,
+  `product_id` int unsigned NOT NULL,
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hi` (`highlight_id`,`product_id`),
+  KEY `fk_hi_prod` (`product_id`),
+  CONSTRAINT `fk_hi_hl` FOREIGN KEY (`highlight_id`) REFERENCES `highlights` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hi_prod` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `highlight_items` (`id`, `highlight_id`, `product_id`, `sort_order`) VALUES
+  (1, 1, 22, 0),
+  (2, 1, 23, 1),
+  (3, 1, 24, 2),
+  (4, 1, 25, 3),
+  (9, 3, 15, 0),
+  (10, 3, 13, 1),
+  (11, 3, 4, 2),
+  (12, 3, 9, 3),
+  (41, 4, 33, 0),
+  (42, 4, 47, 1),
+  (43, 4, 55, 2),
+  (44, 4, 45, 3),
+  (45, 5, 57, 0),
+  (46, 5, 64, 1),
+  (47, 5, 74, 2),
+  (48, 5, 72, 3),
+  (49, 2, 1, 0),
+  (50, 2, 2, 1),
+  (51, 2, 3, 2),
+  (52, 2, 4, 3);
+
+-- ------------------------------------------------------------
+-- discounts
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `discounts`;
+CREATE TABLE `discounts` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `kind` enum('percent','fixed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'percent',
+  `value` int unsigned NOT NULL COMMENT 'percent 0-100, or cents off',
+  `scope` enum('product','category','space','global') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'product',
+  `target_id` int unsigned DEFAULT NULL COMMENT 'id of product/category/space per scope',
+  `starts_at` datetime DEFAULT NULL,
+  `ends_at` datetime DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `priority` smallint NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`),
+  KEY `idx_disc_scope` (`scope`,`target_id`,`is_active`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `discounts` (`id`, `code`, `name`, `kind`, `value`, `scope`, `target_id`, `starts_at`, `ends_at`, `is_active`, `priority`, `created_at`, `updated_at`) VALUES
+  (1, 'SEED-YEEZYFOAMRNN', 'Launch markdown - yeezy-foam-rnnr', 'fixed', 3100, 'product', 22, '2026-08-26 18:50:38', '2026-11-24 18:50:38', 1, 10, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (2, 'SEED-NB530', 'Launch markdown - nb-530', 'fixed', 3100, 'product', 23, '2026-08-26 18:50:38', '2026-11-24 18:50:38', 1, 10, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (3, 'SEED-GEL1130BLACK', 'Launch markdown - gel-1130-black', 'fixed', 4100, 'product', 24, '2026-08-26 18:50:38', '2026-11-24 18:50:38', 1, 10, '2026-08-26 18:50:38', '2026-08-26 18:50:38'),
+  (4, 'SEED-NB1906R', 'Launch markdown - nb-1906r', 'fixed', 5600, 'product', 25, '2026-08-26 18:50:38', '2026-11-24 18:50:38', 1, 10, '2026-08-26 18:50:38', '2026-08-26 18:50:38');
+
+-- ------------------------------------------------------------
+-- admin_users
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `admin_users`;
+CREATE TABLE `admin_users` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `email` varchar(190) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `role` enum('owner','admin','editor') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'admin',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `last_login_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `admin_users` (`id`, `email`, `password_hash`, `name`, `role`, `is_active`, `last_login_at`, `created_at`) VALUES
+  (1, 'admin@metamart.local', '$2b$10$O8L.kIpUTEoAv2i5T8DUPu1eqqudQLhFIbz3SCZ/vB1xjXZanKC8e', 'Owner', 'owner', 1, '2026-08-27 06:30:22', '2026-08-26 18:50:38');
+
+-- ------------------------------------------------------------
+-- settings
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `settings`;
+CREATE TABLE `settings` (
+  `k` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `v_json` json NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`k`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `settings` (`k`, `v_json`, `updated_at`) VALUES
+  ('ai.daily_budget_usd', '5', '2026-08-26 18:50:38'),
+  ('ai.enabled_agents', '["enrich","search","vision","merchandiser","stylist"]', '2026-08-26 18:50:38'),
+  ('ai.provider_order', '["groq","openai","gemini"]', '2026-08-26 18:50:38'),
+  ('mart.currency', '"USD"', '2026-08-26 18:50:38'),
+  ('mart.name', '"METAMART"', '2026-08-26 18:50:38');
+
+-- ------------------------------------------------------------
+-- ai_jobs
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `ai_jobs`;
+CREATE TABLE `ai_jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `request_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `agent` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `intent` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `provider` varchar(24) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `model` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('ok','blocked','error','fallback') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `input_summary` varchar(600) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `output_summary` mediumtext COLLATE utf8mb4_unicode_ci,
+  `tokens_in` int unsigned NOT NULL DEFAULT '0',
+  `tokens_out` int unsigned NOT NULL DEFAULT '0',
+  `cost_usd` decimal(10,6) NOT NULL DEFAULT '0.000000',
+  `latency_ms` int unsigned NOT NULL DEFAULT '0',
+  `guardrail_flags` json DEFAULT NULL,
+  `error` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `actor_type` enum('admin','shopper','system') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'system',
+  `actor_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_agent` (`agent`,`created_at`),
+  KEY `idx_ai_req` (`request_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- (rows intentionally not exported - operational log)
+
+-- ------------------------------------------------------------
+-- audit_log
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `audit_log`;
+CREATE TABLE `audit_log` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `actor_id` int unsigned DEFAULT NULL,
+  `actor_email` varchar(190) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `action` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `entity` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `entity_id` int unsigned DEFAULT NULL,
+  `before_json` json DEFAULT NULL,
+  `after_json` json DEFAULT NULL,
+  `ip` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_entity` (`entity`,`entity_id`,`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=142 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- (rows intentionally not exported - operational log)
 
 SET FOREIGN_KEY_CHECKS = 1;
-
--- ------------------------------------------------------------
--- Architectures - the 3D room blueprints. Capacity limits live
--- here, so a space can never hold more than its room can show.
--- ------------------------------------------------------------
-CREATE TABLE architectures (
-  id                        INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  code                      VARCHAR(40)  NOT NULL UNIQUE,
-  name                      VARCHAR(120) NOT NULL,
-  description               VARCHAR(500) NULL,
-  max_categories            TINYINT UNSIGNED NOT NULL DEFAULT 8,
-  max_products_per_category TINYINT UNSIGNED NOT NULL DEFAULT 5,
-  has_highlight_island      TINYINT(1)   NOT NULL DEFAULT 1,
-  highlight_capacity        TINYINT UNSIGNED NOT NULL DEFAULT 4,
-  layout_json               JSON         NULL,
-  created_at                TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at                TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Spaces - one per store/tenant. Each renders independently:
--- the client only ever loads the space it is standing in.
--- ------------------------------------------------------------
-CREATE TABLE spaces (
-  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  slug            VARCHAR(60)  NOT NULL UNIQUE,
-  name            VARCHAR(120) NOT NULL,
-  tagline         VARCHAR(200) NULL,
-  description     TEXT         NULL,
-  architecture_id INT UNSIGNED NOT NULL,
-  accent_color    CHAR(7)      NOT NULL DEFAULT '#00e5ff',
-  bay_index       TINYINT      NULL COMMENT 'plaza bay 0..8, NULL = gate/anchor store',
-  status          ENUM('live','coming_soon','hidden') NOT NULL DEFAULT 'coming_soon',
-  sort_order      SMALLINT     NOT NULL DEFAULT 0,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_space_arch FOREIGN KEY (architecture_id) REFERENCES architectures(id),
-  UNIQUE KEY uq_space_bay (bay_index),
-  KEY idx_space_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Categories - the wall zones inside a space. slot_index maps to
--- a physical wall position in the architecture layout.
--- ------------------------------------------------------------
-CREATE TABLE categories (
-  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  space_id     INT UNSIGNED NOT NULL,
-  slug         VARCHAR(60)  NOT NULL,
-  name         VARCHAR(120) NOT NULL,
-  accent_color CHAR(7)      NOT NULL DEFAULT '#00e5ff',
-  slot_index   TINYINT UNSIGNED NOT NULL COMMENT 'physical zone slot in the room',
-  sort_order   SMALLINT     NOT NULL DEFAULT 0,
-  is_active    TINYINT(1)   NOT NULL DEFAULT 1,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_cat_space FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_cat_slug (space_id, slug),
-  UNIQUE KEY uq_cat_slot (space_id, slot_index)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Products. Money is stored in integer cents - never floats.
--- ------------------------------------------------------------
-CREATE TABLE products (
-  id                     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  space_id               INT UNSIGNED NOT NULL,
-  category_id            INT UNSIGNED NOT NULL,
-  sku                    VARCHAR(64)  NOT NULL UNIQUE,
-  slug                   VARCHAR(120) NOT NULL,
-  name                   VARCHAR(200) NOT NULL,
-  brand                  VARCHAR(120) NULL,
-  short_description      VARCHAR(320) NULL,
-  description            TEXT         NULL,
-  price_cents            INT UNSIGNED NOT NULL DEFAULT 0,
-  compare_at_price_cents INT UNSIGNED NULL COMMENT 'original price when discounted',
-  currency               CHAR(3)      NOT NULL DEFAULT 'USD',
-  slot_index             TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'pedestal slot in its zone',
-  status                 ENUM('active','draft','archived') NOT NULL DEFAULT 'active',
-  badge                  VARCHAR(32)  NULL COMMENT 'NEW / ICON / TRENDING / HEAT',
-  colorway               VARCHAR(120) NULL,
-  material               VARCHAR(120) NULL,
-  rating                 DECIMAL(3,2) NULL,
-  review_count           INT UNSIGNED NOT NULL DEFAULT 0,
-  stock                  INT          NOT NULL DEFAULT 0,
-  attributes_json        JSON         NULL,
-  ai_fields_json         JSON         NULL COMMENT 'which fields were AI-filled + confidence',
-  created_by             INT UNSIGNED NULL,
-  created_at             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_prod_space FOREIGN KEY (space_id)    REFERENCES spaces(id)     ON DELETE CASCADE,
-  CONSTRAINT fk_prod_cat   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_prod_slug (space_id, slug),
-  KEY idx_prod_cat (category_id, status),
-  KEY idx_prod_space (space_id, status),
-  KEY idx_prod_brand (brand),
-  FULLTEXT KEY ft_prod (name, brand, short_description, description, colorway)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Images - files live in the repo (public/products/...), the DB
--- stores the path only.
--- ------------------------------------------------------------
-CREATE TABLE product_images (
-  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  product_id INT UNSIGNED NOT NULL,
-  file_path  VARCHAR(300) NOT NULL COMMENT 'repo-relative, e.g. products/nike-dunk-panda.jpg',
-  alt_text   VARCHAR(240) NULL,
-  sort_order SMALLINT     NOT NULL DEFAULT 0,
-  is_primary TINYINT(1)   NOT NULL DEFAULT 0,
-  width      SMALLINT UNSIGNED NULL,
-  height     SMALLINT UNSIGNED NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_img_prod FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  KEY idx_img_prod (product_id, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Variants - sizes. size_system keeps EU/US/alpha apart.
--- ------------------------------------------------------------
-CREATE TABLE product_variants (
-  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  product_id        INT UNSIGNED NOT NULL,
-  size_label        VARCHAR(24)  NOT NULL,
-  size_system       ENUM('EU','US','UK','ALPHA','ONE_SIZE') NOT NULL DEFAULT 'EU',
-  sku               VARCHAR(64)  NULL,
-  stock             INT          NOT NULL DEFAULT 0,
-  price_delta_cents INT          NOT NULL DEFAULT 0,
-  sort_order        SMALLINT     NOT NULL DEFAULT 0,
-  is_active         TINYINT(1)   NOT NULL DEFAULT 1,
-  CONSTRAINT fk_var_prod FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_var (product_id, size_system, size_label)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Tags - drives faceted + semantic search.
--- ------------------------------------------------------------
-CREATE TABLE tags (
-  id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  slug VARCHAR(60)  NOT NULL UNIQUE,
-  name VARCHAR(80)  NOT NULL,
-  kind ENUM('style','color','use','material','audience','other') NOT NULL DEFAULT 'other'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE product_tags (
-  product_id INT UNSIGNED NOT NULL,
-  tag_id     INT UNSIGNED NOT NULL,
-  source     ENUM('human','ai') NOT NULL DEFAULT 'human',
-  PRIMARY KEY (product_id, tag_id),
-  CONSTRAINT fk_pt_prod FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pt_tag  FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Search index - denormalised text + embedding for the search
--- and image-search agents.
--- ------------------------------------------------------------
-CREATE TABLE product_search (
-  product_id     INT UNSIGNED NOT NULL PRIMARY KEY,
-  content        MEDIUMTEXT   NOT NULL,
-  embedding_json JSON         NULL,
-  image_vec_json JSON         NULL,
-  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_ps_prod FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  FULLTEXT KEY ft_search (content)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Highlights - the centre island. Title is free text so an admin
--- can call it Sale, Popular, New Arrivals, or anything else.
--- ------------------------------------------------------------
-CREATE TABLE highlights (
-  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  space_id     INT UNSIGNED NOT NULL,
-  code         VARCHAR(40)  NOT NULL COMMENT 'sale | popular | new_arrival | custom-*',
-  title        VARCHAR(80)  NOT NULL COMMENT 'text shown on the island sign',
-  subtitle     VARCHAR(160) NULL,
-  accent_color CHAR(7)      NOT NULL DEFAULT '#ff2d55',
-  is_active    TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'only one active per space',
-  sort_order   SMALLINT     NOT NULL DEFAULT 0,
-  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_hl_space FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_hl_code (space_id, code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE highlight_items (
-  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  highlight_id INT UNSIGNED NOT NULL,
-  product_id   INT UNSIGNED NOT NULL,
-  sort_order   SMALLINT     NOT NULL DEFAULT 0,
-  CONSTRAINT fk_hi_hl   FOREIGN KEY (highlight_id) REFERENCES highlights(id) ON DELETE CASCADE,
-  CONSTRAINT fk_hi_prod FOREIGN KEY (product_id)   REFERENCES products(id)   ON DELETE CASCADE,
-  UNIQUE KEY uq_hi (highlight_id, product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Discounts - can target one product, a category, a space, or all.
--- ------------------------------------------------------------
-CREATE TABLE discounts (
-  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  code       VARCHAR(40)  NULL UNIQUE,
-  name       VARCHAR(120) NOT NULL,
-  kind       ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
-  value      INT UNSIGNED NOT NULL COMMENT 'percent 0-100, or cents off',
-  scope      ENUM('product','category','space','global') NOT NULL DEFAULT 'product',
-  target_id  INT UNSIGNED NULL COMMENT 'id of product/category/space per scope',
-  starts_at  DATETIME     NULL,
-  ends_at    DATETIME     NULL,
-  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
-  priority   SMALLINT     NOT NULL DEFAULT 0,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY idx_disc_scope (scope, target_id, is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Admin users
--- ------------------------------------------------------------
-CREATE TABLE admin_users (
-  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  email         VARCHAR(190) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  name          VARCHAR(120) NOT NULL,
-  role          ENUM('owner','admin','editor') NOT NULL DEFAULT 'admin',
-  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
-  last_login_at DATETIME     NULL,
-  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- AI job log - every agent call, for cost, latency and guardrail
--- audit. This is what makes the agent layer debuggable.
--- ------------------------------------------------------------
-CREATE TABLE ai_jobs (
-  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  request_id      CHAR(36)     NOT NULL,
-  agent           VARCHAR(40)  NOT NULL,
-  intent          VARCHAR(60)  NULL,
-  provider        VARCHAR(24)  NULL,
-  model           VARCHAR(80)  NULL,
-  status          ENUM('ok','blocked','error','fallback') NOT NULL,
-  input_summary   VARCHAR(600) NULL,
-  output_summary  MEDIUMTEXT   NULL,
-  tokens_in       INT UNSIGNED NOT NULL DEFAULT 0,
-  tokens_out      INT UNSIGNED NOT NULL DEFAULT 0,
-  cost_usd        DECIMAL(10,6) NOT NULL DEFAULT 0,
-  latency_ms      INT UNSIGNED NOT NULL DEFAULT 0,
-  guardrail_flags JSON         NULL,
-  error           VARCHAR(500) NULL,
-  actor_type      ENUM('admin','shopper','system') NOT NULL DEFAULT 'system',
-  actor_id        VARCHAR(64)  NULL,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_ai_agent (agent, created_at),
-  KEY idx_ai_req (request_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Audit log - who changed what.
--- ------------------------------------------------------------
-CREATE TABLE audit_log (
-  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  actor_id    INT UNSIGNED NULL,
-  actor_email VARCHAR(190) NULL,
-  action      VARCHAR(40)  NOT NULL,
-  entity      VARCHAR(40)  NOT NULL,
-  entity_id   INT UNSIGNED NULL,
-  before_json JSON         NULL,
-  after_json  JSON         NULL,
-  ip          VARCHAR(45)  NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_audit_entity (entity, entity_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- Settings
--- ------------------------------------------------------------
-CREATE TABLE settings (
-  k          VARCHAR(80) PRIMARY KEY,
-  v_json     JSON        NOT NULL,
-  updated_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ============================================================
---  METAMART - seed data
---  Generated by scripts/gen-seed.mjs - do not edit by hand.
--- ============================================================
-SET NAMES utf8mb4;
-
--- ---------- architectures ----------
-INSERT INTO architectures (code, name, description, max_categories, max_products_per_category, has_highlight_island, highlight_capacity, layout_json) VALUES
-  ('l_hall', 'L-Hall Flagship', 'Anchor store: main hall plus a wing, brand walls on three sides and a highlight island in the centre.', 8, 5, 1, 4, '{"regions":["hall","wing"],"categorySlots":[{"slot":0,"wall":"west","label":"Main hall west"},{"slot":1,"wall":"north","label":"Main hall north"},{"slot":2,"wall":"east","label":"Main hall east"},{"slot":3,"wall":"wing_west","label":"Wing west"},{"slot":4,"wall":"wing_east","label":"Wing east"},{"slot":5,"wall":"wing_south","label":"Wing south"},{"slot":6,"wall":"hall_south_a","label":"Hall south A"},{"slot":7,"wall":"hall_south_b","label":"Hall south B"}]}');
-INSERT INTO architectures (code, name, description, max_categories, max_products_per_category, has_highlight_island, highlight_capacity, layout_json) VALUES
-  ('boutique', 'Boutique Room', 'Single square room, four display walls and a small centre plinth. For smaller tenants.', 4, 5, 1, 3, '{"regions":["room"],"categorySlots":[{"slot":0,"wall":"west","label":"West wall"},{"slot":1,"wall":"north","label":"North wall"},{"slot":2,"wall":"east","label":"East wall"},{"slot":3,"wall":"south","label":"South wall"}]}');
-INSERT INTO architectures (code, name, description, max_categories, max_products_per_category, has_highlight_island, highlight_capacity, layout_json) VALUES
-  ('gallery', 'Gallery Loft', 'Long daylight gallery with six bays down two colonnades and an end-wall feature.', 7, 5, 0, 0, '{"regions":["gallery"],"categorySlots":[{"slot":0,"wall":"bay_w1","label":"West bay 1"},{"slot":1,"wall":"bay_w2","label":"West bay 2"},{"slot":2,"wall":"bay_w3","label":"West bay 3"},{"slot":3,"wall":"bay_e1","label":"East bay 1"},{"slot":4,"wall":"bay_e2","label":"East bay 2"},{"slot":5,"wall":"bay_e3","label":"East bay 3"},{"slot":6,"wall":"end","label":"End wall feature"}]}');
-
--- ---------- spaces ----------
-INSERT INTO spaces (slug, name, tagline, description, architecture_id, accent_color, bay_index, status, sort_order) VALUES
-  ('solespace', 'SoleSpace', 'Sneakers, curated.', 'The anchor store of METAMART: six brand walls across a daylight hall and wing, plus a rotating highlight island.', (SELECT id FROM architectures WHERE code='l_hall'), '#00e5ff', NULL, 'live', 0),
-  ('menswear', 'Men''s Wear', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='gallery'), '#4cc9f0', 0, 'coming_soon', 1),
-  ('womenswear', 'Women''s Wear', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='gallery'), '#ff7ab6', 1, 'coming_soon', 2),
-  ('gadgets', 'Gadgets', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='boutique'), '#9b5de5', 2, 'coming_soon', 3),
-  ('bags', 'Bags & Luggage', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='boutique'), '#c98b5e', 3, 'coming_soon', 4),
-  ('sports', 'Sports & Jerseys', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='gallery'), '#3ddc84', 4, 'coming_soon', 5),
-  ('watches', 'Watches', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='boutique'), '#ffd166', 5, 'coming_soon', 6),
-  ('beauty', 'Beauty', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='boutique'), '#ff6a8a', 6, 'coming_soon', 7),
-  ('kids', 'Kids & Toys', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='gallery'), '#ffa94d', 7, 'coming_soon', 8),
-  ('home', 'Home & Living', 'Opening soon on METAMART.', NULL, (SELECT id FROM architectures WHERE code='boutique'), '#2ec4b6', 8, 'coming_soon', 9);
-
--- ---------- categories (SoleSpace) ----------
-INSERT INTO categories (space_id, slug, name, accent_color, slot_index, sort_order) VALUES
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'nike', 'Nike', '#ff6a2b', 0, 0),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'jordan', 'Jordan', '#e63946', 1, 1),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'adidas', 'adidas', '#4895ef', 2, 2),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'newbalance', 'New Balance', '#2ec4b6', 3, 3),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'asics', 'ASICS', '#9b5de5', 4, 4),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'converse', 'Converse', '#ffd166', 5, 5);
-
--- ---------- products ----------
-INSERT INTO products (space_id, category_id, sku, slug, name, brand, short_description, description, price_cents, currency, slot_index, status, badge, stock, attributes_json) VALUES
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='nike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NIK-01-DUNKPANDA', 'dunk-panda', 'Dunk Low "Panda"', 'Nike', 'The black-and-white staple that refuses to stay in stock. Goes with everything you own.', 'The black-and-white staple that refuses to stay in stock. Goes with everything you own.', 11500, 'USD', 0, 'active', NULL, 20, '{"source":"seed","original_id":"dunk-panda"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='nike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NIK-02-AF1WHITE', 'af1-white', 'Air Force 1 ''07', 'Nike', 'Triple white. The most worn sneaker on planet Earth, and still undefeated.', 'Triple white. The most worn sneaker on planet Earth, and still undefeated.', 11000, 'USD', 1, 'active', NULL, 27, '{"source":"seed","original_id":"af1-white"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='nike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NIK-03-DUNKGREYFO', 'dunk-grey-fog', 'Dunk Low "Grey Fog"', 'Nike', 'Soft grey overlays on crisp white leather. The Panda''s calmer sibling.', 'Soft grey overlays on crisp white leather. The Panda''s calmer sibling.', 11000, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"dunk-grey-fog"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='nike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NIK-04-KOBE6GRINC', 'kobe-6-grinch', 'Kobe 6 "Reverse Grinch"', 'Nike', 'Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', 'Christmas-day energy all year. Sharp, fast, and impossible to miss on court.', 19000, 'USD', 3, 'active', 'HEAT', 41, '{"source":"seed","original_id":"kobe-6-grinch"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='jordan' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-JOR-01-AJ3WHITECE', 'aj3-white-cement', 'Air Jordan 3 "White Cement"', 'Jordan', 'Elephant print, visible Air, and history in every step. The ''88 icon reimagined.', 'Elephant print, visible Air, and history in every step. The ''88 icon reimagined.', 20000, 'USD', 0, 'active', NULL, 20, '{"source":"seed","original_id":"aj3-white-cement"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='jordan' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-JOR-02-AJ4MILITAR', 'aj4-military', 'Air Jordan 4 "Military Black"', 'Jordan', 'Clean white base, black hits, endless outfit rotation. A modern-day essential.', 'Clean white base, black hits, endless outfit rotation. A modern-day essential.', 21500, 'USD', 1, 'active', 'ICON', 27, '{"source":"seed","original_id":"aj4-military"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='jordan' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-JOR-03-AJ11COOLGR', 'aj11-cool-grey', 'Air Jordan 11 "Cool Grey"', 'Jordan', 'Patent leather shine in signature Cool Grey. Dress code approved, court certified.', 'Patent leather shine in signature Cool Grey. Dress code approved, court certified.', 22500, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"aj11-cool-grey"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='adidas' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ADI-01-SAMBAOG', 'samba-og', 'Samba OG', 'adidas', 'Terrace classic turned global fashion staple. White leather, gum sole, done.', 'Terrace classic turned global fashion staple. White leather, gum sole, done.', 10000, 'USD', 0, 'active', 'TRENDING', 20, '{"source":"seed","original_id":"samba-og"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='adidas' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ADI-02-CAMPUS00S', 'campus-00s', 'Campus 00s', 'adidas', 'Chunky Y2K proportions with premium suede. The skate-shop look, revived.', 'Chunky Y2K proportions with premium suede. The skate-shop look, revived.', 11000, 'USD', 1, 'active', NULL, 27, '{"source":"seed","original_id":"campus-00s"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='adidas' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ADI-03-SUPERSTAR', 'superstar', 'Superstar', 'adidas', 'Shell toe. Three stripes. Fifty years of street cred in one silhouette.', 'Shell toe. Three stripes. Fifty years of street cred in one silhouette.', 9500, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"superstar"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='adidas' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ADI-04-YEEZY350ZE', 'yeezy-350-zebra', 'Yeezy Boost 350 V2 "Zebra"', 'adidas', 'The unmistakable stripe pattern on Primeknit, riding full-length Boost.', 'The unmistakable stripe pattern on Primeknit, riding full-length Boost.', 23000, 'USD', 3, 'active', NULL, 41, '{"source":"seed","original_id":"yeezy-350-zebra"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='newbalance' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NEW-01-NB550', 'nb-550', '550 "White Grey"', 'New Balance', 'The ''89 basketball shape that took over the streets. Perfectly aged proportions.', 'The ''89 basketball shape that took over the streets. Perfectly aged proportions.', 13000, 'USD', 0, 'active', NULL, 20, '{"source":"seed","original_id":"nb-550"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='newbalance' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NEW-02-NB2002RRAI', 'nb-2002r-rain', '2002R "Rain Cloud"', 'New Balance', 'Protection Pack construction with soft layered greys. Comfort with edge.', 'Protection Pack construction with soft layered greys. Comfort with edge.', 15000, 'USD', 1, 'active', 'NEW', 27, '{"source":"seed","original_id":"nb-2002r-rain"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='newbalance' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NEW-03-NB9060', 'nb-9060', '9060 "Sea Salt"', 'New Balance', 'Warped lines and creamy tones — a futurist remix of the classic 99X series.', 'Warped lines and creamy tones — a futurist remix of the classic 99X series.', 16000, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"nb-9060"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='asics' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ASI-01-GELKAYANO1', 'gel-kayano-14', 'GEL-Kayano 14', 'ASICS', 'Y2K running tech turned runway favorite. White and pure silver mesh magic.', 'Y2K running tech turned runway favorite. White and pure silver mesh magic.', 15000, 'USD', 0, 'active', 'NEW', 20, '{"source":"seed","original_id":"gel-kayano-14"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='asics' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ASI-02-GEL1130', 'gel-1130', 'GEL-1130 "Clay Canyon"', 'ASICS', 'Retro runner DNA with modern comfort. The quiet flex of people who know.', 'Retro runner DNA with modern comfort. The quiet flex of people who know.', 12000, 'USD', 1, 'active', NULL, 27, '{"source":"seed","original_id":"gel-1130"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='asics' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ASI-03-GELNYCARCT', 'gel-nyc-arctic', 'GEL-NYC "Arctic Sky"', 'ASICS', 'Layered cream and icy blue inspired by early-2000s city marathons.', 'Layered cream and icy blue inspired by early-2000s city marathons.', 13000, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"gel-nyc-arctic"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='asics' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ASI-04-GELNYCGRAP', 'gel-nyc-graphite', 'GEL-NYC "Graphite"', 'ASICS', 'Tonal grey stack with reflective hits. Urban camouflage, elevated.', 'Tonal grey stack with reflective hits. Urban camouflage, elevated.', 13000, 'USD', 3, 'active', NULL, 41, '{"source":"seed","original_id":"gel-nyc-graphite"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='converse' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-CON-01-CHUCKHI', 'chuck-hi', 'Chuck Taylor All Star Hi', 'Converse', 'The canvas high-top that started it all. Every generation makes it theirs.', 'The canvas high-top that started it all. Every generation makes it theirs.', 6500, 'USD', 0, 'active', NULL, 20, '{"source":"seed","original_id":"chuck-hi"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='converse' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-CON-02-CHUCK70OX', 'chuck-70-ox', 'Chuck 70 Ox "Parchment"', 'Converse', 'Vintage-spec construction, warmer canvas, higher foxing. The connoisseur''s Chuck.', 'Vintage-spec construction, warmer canvas, higher foxing. The connoisseur''s Chuck.', 8500, 'USD', 1, 'active', NULL, 27, '{"source":"seed","original_id":"chuck-70-ox"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='converse' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-CON-03-RUNSTARHIK', 'run-star-hike', 'Run Star Hike', 'Converse', 'The Chuck on a platform lugged sole. Height, attitude, and grip included.', 'The Chuck on a platform lugged sole. Height, attitude, and grip included.', 11000, 'USD', 2, 'active', NULL, 34, '{"source":"seed","original_id":"run-star-hike"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='adidas' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ADI-05-YEEZYFOAMR', 'yeezy-foam-rnnr', 'Yeezy Foam Runner "Onyx"', 'adidas', 'Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.', 'Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.', 9000, 'USD', 4, 'active', 'SALE', 48, '{"source":"seed","original_id":"yeezy-foam-rnnr"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='newbalance' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NEW-04-NB530', 'nb-530', 'New Balance 530', 'New Balance', 'Silvery retro runner with everyday comfort. Last sizes going fast.', 'Silvery retro runner with everyday comfort. Last sizes going fast.', 10000, 'USD', 3, 'active', 'SALE', 41, '{"source":"seed","original_id":"nb-530"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='asics' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-ASI-05-GEL1130BLA', 'gel-1130-black', 'ASICS GEL-1130 "Black"', 'ASICS', 'The stealth colorway of the fan favorite. Discounted, not discontinued.', 'The stealth colorway of the fan favorite. Discounted, not discontinued.', 12000, 'USD', 4, 'active', 'SALE', 48, '{"source":"seed","original_id":"gel-1130-black"}'),
-  ((SELECT id FROM spaces WHERE slug='solespace'), (SELECT id FROM categories WHERE slug='newbalance' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'SS-NEW-05-NB1906R', 'nb-1906r', 'New Balance 1906R', 'New Balance', 'Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.', 'Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.', 15500, 'USD', 4, 'active', 'SALE', 48, '{"source":"seed","original_id":"nb-1906r"}');
-
--- ---------- product images ----------
-INSERT INTO product_images (product_id, file_path, alt_text, sort_order, is_primary) VALUES
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nike-dunk-panda.jpg', 'Dunk Low "Panda" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nike-af1-a.jpg', 'Air Force 1 ''07 product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nike-dunk-fog.jpg', 'Dunk Low "Grey Fog" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nike-kobe6.jpg', 'Kobe 6 "Reverse Grinch" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/aj3-cement.jpg', 'Air Jordan 3 "White Cement" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/aj4-military.jpg', 'Air Jordan 4 "Military Black" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/aj11-cool-grey.jpg', 'Air Jordan 11 "Cool Grey" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/samba-og.jpg', 'Samba OG product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/campus-00s.jpg', 'Campus 00s product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/superstar.jpg', 'Superstar product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/yeezy-350-zebra.jpg', 'Yeezy Boost 350 V2 "Zebra" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nb-550.jpg', '550 "White Grey" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nb-2002r-rain.jpg', '2002R "Rain Cloud" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nb-9060-sea-salt.jpg', '9060 "Sea Salt" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/asics-k14-silver.jpg', 'GEL-Kayano 14 product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/asics-1130.jpg', 'GEL-1130 "Clay Canyon" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/asics-nyc-arctic.jpg', 'GEL-NYC "Arctic Sky" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/asics-nyc-graphite.jpg', 'GEL-NYC "Graphite" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/chuck-classic-hi.jpg', 'Chuck Taylor All Star Hi product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/chuck-70-ox.jpg', 'Chuck 70 Ox "Parchment" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/run-star-hike.jpg', 'Run Star Hike product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/yeezy-foam-rnnr.jpg', 'Yeezy Foam Runner "Onyx" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nb-530.jpg', 'New Balance 530 product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/asics-1130-black.jpg', 'ASICS GEL-1130 "Black" product photo', 0, 1),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'products/nb-1906r.jpg', 'New Balance 1906R product photo', 0, 1);
-
--- ---------- product variants (EU sizes) ----------
-INSERT INTO product_variants (product_id, size_label, size_system, stock, sort_order) VALUES
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '40', 'EU', 7, 0),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '41', 'EU', 9, 1),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '42', 'EU', 11, 2),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '43', 'EU', 4, 3),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '44', 'EU', 6, 4),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '45', 'EU', 8, 5);
-
--- ---------- tags ----------
-INSERT INTO tags (slug, name, kind) VALUES
-  ('sneakers', 'Sneakers', 'style'),
-  ('retro', 'Retro', 'style'),
-  ('running', 'Running', 'use'),
-  ('basketball', 'Basketball', 'use'),
-  ('lifestyle', 'Lifestyle', 'use'),
-  ('skate', 'Skate', 'use'),
-  ('white', 'White', 'color'),
-  ('black', 'Black', 'color'),
-  ('grey', 'Grey', 'color'),
-  ('leather', 'Leather', 'material'),
-  ('canvas', 'Canvas', 'material'),
-  ('mesh', 'Mesh', 'material'),
-  ('knit', 'Knit', 'material'),
-  ('suede', 'Suede', 'material'),
-  ('unisex', 'Unisex', 'audience'),
-  ('limited', 'Limited', 'other'),
-  ('classic', 'Classic', 'other');
-
--- ---------- product tags (keyword pass; AI refines later) ----------
-INSERT INTO product_tags (product_id, tag_id, source) VALUES
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='black'), 'human'),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='grey'), 'human'),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='leather'), 'human'),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='black'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='grey'), 'human'),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='leather'), 'human'),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='leather'), 'human'),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='classic'), 'human'),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='skate'), 'human'),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='suede'), 'human'),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='knit'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='basketball'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='grey'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='grey'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='classic'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='running'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='white'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='mesh'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='retro'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='grey'), 'human'),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='canvas'), 'human'),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='canvas'), 'human'),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='retro'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human'),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='black'), 'human'),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM tags WHERE slug='sneakers'), 'human');
-
--- ---------- highlights (centre island presets) ----------
-INSERT INTO highlights (space_id, code, title, subtitle, accent_color, is_active, sort_order) VALUES
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'sale', 'SALE %', 'Marked down while stock lasts', '#ff2d55', 1, 0),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'popular', 'POPULAR', 'What everyone is buying', '#ffd166', 0, 1),
-  ((SELECT id FROM spaces WHERE slug='solespace'), 'new_arrival', 'NEW ARRIVALS', 'Fresh on the shelves', '#3ddc84', 0, 2);
-
--- ---------- highlight items ----------
-INSERT INTO highlight_items (highlight_id, product_id, sort_order) VALUES
-  ((SELECT id FROM highlights WHERE code='sale' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 0),
-  ((SELECT id FROM highlights WHERE code='sale' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 1),
-  ((SELECT id FROM highlights WHERE code='sale' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 2),
-  ((SELECT id FROM highlights WHERE code='sale' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 3),
-  ((SELECT id FROM highlights WHERE code='popular' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 0),
-  ((SELECT id FROM highlights WHERE code='popular' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 1),
-  ((SELECT id FROM highlights WHERE code='popular' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 2),
-  ((SELECT id FROM highlights WHERE code='popular' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 3),
-  ((SELECT id FROM highlights WHERE code='new_arrival' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 0),
-  ((SELECT id FROM highlights WHERE code='new_arrival' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 1),
-  ((SELECT id FROM highlights WHERE code='new_arrival' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 2),
-  ((SELECT id FROM highlights WHERE code='new_arrival' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), (SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 3);
-
--- ---------- discounts ----------
-INSERT INTO discounts (code, name, kind, value, scope, target_id, starts_at, ends_at, is_active, priority) VALUES
-  ('SEED-YEEZYFOAMRNN', 'Launch markdown - yeezy-foam-rnnr', 'fixed', 3100, 'product', (SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), 1, 10),
-  ('SEED-NB530', 'Launch markdown - nb-530', 'fixed', 3100, 'product', (SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), 1, 10),
-  ('SEED-GEL1130BLACK', 'Launch markdown - gel-1130-black', 'fixed', 4100, 'product', (SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), 1, 10),
-  ('SEED-NB1906R', 'Launch markdown - nb-1906r', 'fixed', 5600, 'product', (SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY), 1, 10);
-
--- ---------- search index (text; embeddings filled by the AI worker) ----------
-INSERT INTO product_search (product_id, content) VALUES
-  ((SELECT id FROM products WHERE slug='dunk-panda' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Dunk Low "Panda" Nike nike sneakers The black-and-white staple that refuses to stay in stock. Goes with everything you own.'),
-  ((SELECT id FROM products WHERE slug='af1-white' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Air Force 1 ''07 Nike nike sneakers Triple white. The most worn sneaker on planet Earth, and still undefeated.'),
-  ((SELECT id FROM products WHERE slug='dunk-grey-fog' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Dunk Low "Grey Fog" Nike nike sneakers Soft grey overlays on crisp white leather. The Panda''s calmer sibling.'),
-  ((SELECT id FROM products WHERE slug='kobe-6-grinch' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Kobe 6 "Reverse Grinch" Nike nike sneakers Christmas-day energy all year. Sharp, fast, and impossible to miss on court.'),
-  ((SELECT id FROM products WHERE slug='aj3-white-cement' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Air Jordan 3 "White Cement" Jordan jordan sneakers Elephant print, visible Air, and history in every step. The ''88 icon reimagined.'),
-  ((SELECT id FROM products WHERE slug='aj4-military' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Air Jordan 4 "Military Black" Jordan jordan sneakers Clean white base, black hits, endless outfit rotation. A modern-day essential.'),
-  ((SELECT id FROM products WHERE slug='aj11-cool-grey' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Air Jordan 11 "Cool Grey" Jordan jordan sneakers Patent leather shine in signature Cool Grey. Dress code approved, court certified.'),
-  ((SELECT id FROM products WHERE slug='samba-og' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Samba OG adidas adidas sneakers Terrace classic turned global fashion staple. White leather, gum sole, done.'),
-  ((SELECT id FROM products WHERE slug='campus-00s' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Campus 00s adidas adidas sneakers Chunky Y2K proportions with premium suede. The skate-shop look, revived.'),
-  ((SELECT id FROM products WHERE slug='superstar' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Superstar adidas adidas sneakers Shell toe. Three stripes. Fifty years of street cred in one silhouette.'),
-  ((SELECT id FROM products WHERE slug='yeezy-350-zebra' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Yeezy Boost 350 V2 "Zebra" adidas adidas sneakers The unmistakable stripe pattern on Primeknit, riding full-length Boost.'),
-  ((SELECT id FROM products WHERE slug='nb-550' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '550 "White Grey" New Balance newbalance sneakers The ''89 basketball shape that took over the streets. Perfectly aged proportions.'),
-  ((SELECT id FROM products WHERE slug='nb-2002r-rain' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '2002R "Rain Cloud" New Balance newbalance sneakers Protection Pack construction with soft layered greys. Comfort with edge.'),
-  ((SELECT id FROM products WHERE slug='nb-9060' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), '9060 "Sea Salt" New Balance newbalance sneakers Warped lines and creamy tones — a futurist remix of the classic 99X series.'),
-  ((SELECT id FROM products WHERE slug='gel-kayano-14' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'GEL-Kayano 14 ASICS asics sneakers Y2K running tech turned runway favorite. White and pure silver mesh magic.'),
-  ((SELECT id FROM products WHERE slug='gel-1130' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'GEL-1130 "Clay Canyon" ASICS asics sneakers Retro runner DNA with modern comfort. The quiet flex of people who know.'),
-  ((SELECT id FROM products WHERE slug='gel-nyc-arctic' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'GEL-NYC "Arctic Sky" ASICS asics sneakers Layered cream and icy blue inspired by early-2000s city marathons.'),
-  ((SELECT id FROM products WHERE slug='gel-nyc-graphite' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'GEL-NYC "Graphite" ASICS asics sneakers Tonal grey stack with reflective hits. Urban camouflage, elevated.'),
-  ((SELECT id FROM products WHERE slug='chuck-hi' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Chuck Taylor All Star Hi Converse converse sneakers The canvas high-top that started it all. Every generation makes it theirs.'),
-  ((SELECT id FROM products WHERE slug='chuck-70-ox' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Chuck 70 Ox "Parchment" Converse converse sneakers Vintage-spec construction, warmer canvas, higher foxing. The connoisseur''s Chuck.'),
-  ((SELECT id FROM products WHERE slug='run-star-hike' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Run Star Hike Converse converse sneakers The Chuck on a platform lugged sole. Height, attitude, and grip included.'),
-  ((SELECT id FROM products WHERE slug='yeezy-foam-rnnr' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'Yeezy Foam Runner "Onyx" adidas adidas sneakers Sculptural one-piece foam. Feels like walking on the moon, priced like Earth.'),
-  ((SELECT id FROM products WHERE slug='nb-530' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'New Balance 530 New Balance newbalance sneakers Silvery retro runner with everyday comfort. Last sizes going fast.'),
-  ((SELECT id FROM products WHERE slug='gel-1130-black' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'ASICS GEL-1130 "Black" ASICS asics sneakers The stealth colorway of the fan favorite. Discounted, not discontinued.'),
-  ((SELECT id FROM products WHERE slug='nb-1906r' AND space_id=(SELECT id FROM spaces WHERE slug='solespace')), 'New Balance 1906R New Balance newbalance sneakers Tech-runner shine in Sea Salt metallics. Premium comfort, clearance price.');
-
--- ---------- admin user ----------
--- Default login: admin@metamart.local  /  ChangeMe!2026   <-- CHANGE THIS AFTER FIRST LOGIN
-INSERT INTO admin_users (email, password_hash, name, role) VALUES
-  ('admin@metamart.local', '$2b$10$O8L.kIpUTEoAv2i5T8DUPu1eqqudQLhFIbz3SCZ/vB1xjXZanKC8e', 'Owner', 'owner');
-
--- ---------- settings ----------
-INSERT INTO settings (k, v_json) VALUES
-  ('mart.name', '"METAMART"'),
-  ('mart.currency', '"USD"'),
-  ('ai.provider_order', '["groq","openai","gemini"]'),
-  ('ai.enabled_agents', '["enrich","search","vision","merchandiser","stylist"]'),
-  ('ai.daily_budget_usd', '5');
-
--- end of seed
-
 COMMIT;
+
+-- end of dump
