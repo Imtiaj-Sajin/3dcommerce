@@ -237,6 +237,7 @@ export function buildConcourse(scene, ctx) {
   const glowGeos = [];    // clerestory panes + cove strips
   const brightGeos = [];  // door pulls — brushed, so they read on dark glass
   const markGeos = [];    // floor inlay
+  const entries = [];     // where the player can walk into a tenant
 
   const face = (arr, w, h, m4, x, y, z) => {
     const g = new THREE.PlaneGeometry(w, h);
@@ -415,6 +416,16 @@ export function buildConcourse(scene, ctx) {
     plaque.userData = { type: 'tenant', tenantId: t.id };
     scene.add(plaque);
     interactables.push(plaque);
+
+    // Where you have to stand to go in. Local +z faces the plaza (the door
+    // leaf is set back at -0.3), so this sits just outside the threshold.
+    entries.push({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      accent: t.accent,
+      position: new THREE.Vector3(0, 0, 1.15).applyMatrix4(m4),
+    });
     // dim and slow — these shops aren't open yet
     pulsing.push({ material: plaque.material, base: 0.82, amp: 0.12, speed: 0.9, phase: i * 0.7 });
 
@@ -491,8 +502,12 @@ export function buildConcourse(scene, ctx) {
 
   scene.add(new THREE.Mesh(
     mergeGeometries(doorGeos),
+    // Frosted, not clear: the interiors are separate scenes that do not exist
+    // until you walk in, so the glass has to read as "you cannot see through
+    // this" rather than "there is nothing behind this".
     new THREE.MeshStandardMaterial({
-      color: 0x121722, roughness: 0.2, metalness: 0.06, envMapIntensity: 0.9,
+      color: 0x2b3442, roughness: 0.92, metalness: 0.0,
+      envMapIntensity: 0.35, transparent: true, opacity: 0.97,
     })
   ));
 
@@ -614,6 +629,7 @@ export function buildConcourse(scene, ctx) {
   /* ---------------- per-frame ---------------- */
 
   return {
+    entries,
     update(t) {
       directory.rotation.y = -t * 0.12;
     },

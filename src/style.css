@@ -642,3 +642,54 @@ html, body {
   .hud-search { flex-basis: 210px; margin: 0 10px; }
   #search-input::placeholder { content: 'Search'; }
 }
+
+/* ================= doorway entry ================= */
+
+#enter-prompt {
+  position: fixed;
+  left: 50%;
+  /* clear of the toast (bottom 84 + ~40 tall) and the zone nav */
+  bottom: 156px;
+  transform: translateX(-50%);
+  z-index: 25;
+  text-align: center;
+  pointer-events: none;
+  animation: epin 0.22s ease;
+}
+@keyframes epin {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.ep-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--ep, #fff);
+  text-shadow: 0 0 22px var(--ep, #fff), 0 2px 14px rgba(0, 0, 0, 0.7);
+}
+.ep-hint {
+  margin-top: 7px;
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(12, 15, 22, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+  display: inline-block;
+  backdrop-filter: blur(8px);
+}
+#enter-prompt.closed .ep-hint { color: var(--muted); }
+
+/* the wipe between spaces */
+#transition {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 55%, var(--tr, #00e5ff) 0%, #05070c 70%);
+  transition: opacity 0.42s ease;
+}
+#transition.on { opacity: 1; }

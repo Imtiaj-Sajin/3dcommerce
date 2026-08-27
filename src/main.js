@@ -179,28 +179,82 @@ const interactions = new Interactions(camera, canvas, shop.interactables, {
  * next one is fetched and built. There is no door to open - you walk into the
  * bay and you are there. */
 
+let entering = false;
+
 function enterSpace(slug) {
+  if (entering) return;
   const entry = directory.find((s) => s.slug === slug);
   const tenant = TENANTS.find((t) => t.id === slug);
   const name = entry?.name || tenant?.name || 'This store';
 
-  if (entry && entry.status !== 'live') {
+  if (!entry || entry.status !== 'live') {
     ui.toast(`${name} — leasing now, opening soon on METAMART 🏗️`);
     return;
   }
-  if (!entry) {
-    ui.toast(`${name} — not open yet 🏗️`);
+
+  entering = true;
+  hideEnterPrompt();
+
+  // Wipe in the store's own colour, then reload. The reload is deliberate:
+  // it guarantees the previous space's meshes, textures and NPCs are gone
+  // rather than lingering in GPU memory.
+  const wipe = document.getElementById('transition');
+  wipe.style.setProperty('--tr', entry.accent_color || '#00e5ff');
+  wipe.classList.add('on');
+  setTimeout(() => {
+    location.search = `?space=${encodeURIComponent(slug)}`;
+  }, 430);
+}
+
+/* ---------------- walking into a shopfront ----------------
+ * Clicking a sign high on the drum wall was never discoverable. Standing in
+ * a doorway is: get close and the store names itself, step in and you are
+ * through. */
+
+const PROMPT_RADIUS = 5.0;
+const ENTER_RADIUS = 1.75;
+
+const promptEl = document.getElementById('enter-prompt');
+let promptedId = null;
+
+function hideEnterPrompt() {
+  promptEl?.classList.add('hidden');
+  promptedId = null;
+}
+
+function showEnterPrompt(entry, open) {
+  if (promptedId === entry.id) return;
+  promptedId = entry.id;
+  promptEl.style.setProperty('--ep', entry.accent);
+  promptEl.querySelector('.ep-name').textContent = entry.name;
+  promptEl.querySelector('.ep-hint').textContent = open
+    ? 'Walk in to enter'
+    : 'Opening soon';
+  promptEl.classList.toggle('closed', !open);
+  promptEl.classList.remove('hidden');
+}
+
+function updateDoorways() {
+  if (!player || entering || !shop.entries?.length) return;
+  const p = player.root.position;
+
+  let nearest = null;
+  let nearestD = Infinity;
+  for (const e of shop.entries) {
+    const d = Math.hypot(e.position.x - p.x, e.position.z - p.z);
+    if (d < nearestD) {
+      nearestD = d;
+      nearest = e;
+    }
+  }
+  if (!nearest || nearestD > PROMPT_RADIUS) {
+    if (promptedId) hideEnterPrompt();
     return;
   }
 
-  ui.toast(`Entering ${name}…`);
-  const loader = document.getElementById('loader');
-  loader.classList.remove('fade');
-  // A full reload is deliberate: it guarantees the previous space's meshes,
-  // textures and NPCs are gone rather than lingering in GPU memory.
-  setTimeout(() => {
-    location.search = `?space=${encodeURIComponent(slug)}`;
-  }, 450);
+  const open = nearest.status === 'open';
+  showEnterPrompt(nearest, open);
+  if (open && nearestD < ENTER_RADIUS) enterSpace(nearest.id);
 }
 interactions.setClickGuard(() => chaseCam.wasClick() && !ui.modalOpen);
 
@@ -272,6 +326,7 @@ function animate() {
       interactions.update(dt);
       // camera swings in behind the character on its own while walking
       if (player.isMoving) chaseCam.followBehind(player.heading, dt);
+      updateDoorways();
     }
     chaseCam.update(dt, player.root.position);
 

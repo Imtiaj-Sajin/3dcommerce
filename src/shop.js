@@ -685,5 +685,5 @@ export function buildShop(scene, camera, directory = []) {
     pGeo.attributes.position.needsUpdate = true;
   }
 
-  return { interactables, productViews, browsePoints, colliders, update, sun };
+  return { interactables, productViews, browsePoints, colliders, update, sun, entries: concourse.entries ?? [] };
 }
