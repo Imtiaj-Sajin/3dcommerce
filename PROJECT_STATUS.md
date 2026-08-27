@@ -91,13 +91,34 @@ accepts all. Verified end-to-end in Chromium.
 space**. Zones are addressed by slot index, so the room renders whatever the
 database contains. The island title/accent/products come from the DB.
 
+### Shopper AI UI — done
+The HUD carries a search bar and a camera button, and the product card has a
+try-on panel:
+
+- **Text search** — natural language → filters → a results panel that explains
+  what it searched for. Clicking a result walks your character to that
+  pedestal and opens the card.
+- **Photo search** — upload or snap a photo; it is downscaled client-side,
+  read by the vision agent, then matched against this store.
+- **Try-on** — pick a build (XS–XXL), optionally add your own photo, and get a
+  rendered preview. The selfie is transient: never written to disk or the DB.
+
+Typing in the search box does not walk the character (verified).
+
+### Image generation — Hugging Face
+`AI_IMAGE_PROVIDER_ORDER=huggingface,gemini`. HF routes through
+nscale/FLUX.1-schnell: ~12s a render and free-tier friendly. OpenAI's
+`gpt-image-1` is implemented but deliberately left out of the order because it
+is expensive (~50s and real money per render).
+
 ### Tests
 ```bash
 npm run test:api        # 23 checks: capacity, pricing, guardrails, agents
 npm run test:browser    # boots the client in Chromium (7 checks)
-node scripts/admin-smoke.mjs   # drives the admin console (11 checks)
+npm run test:shopper    # search, photo search, try-on in the browser (8 checks)
+npm run test:admin      # admin console incl. AI autofill (11 checks)
 ```
-All green as of this commit.
+All green as of this commit — 49 checks total.
 
 ---
 
