@@ -11,8 +11,9 @@
 // That keeps the feature to its purpose: showing a customer their own fit.
 
 import { z } from 'zod';
-import { complete, generateImage } from './providers.js';
+import { complete, generateImage, availableImageProviders, imageProviderTakesReferences } from './providers.js';
 import { validateOutput } from './guardrails.js';
+import { describeImage } from './vision.js';
 import { one } from '../lib/db.js';
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -81,15 +82,41 @@ export async function renderTryOn(input) {
     console.warn('[stylist] brief failed, using default:', e.message);
   }
 
-  // 2. render. Prompt is fully constructed by us.
+  // 2. Decide how the product reaches the renderer.
+  //
+  // The cheap image providers are text-to-image only, so we cannot hand them
+  // the product photo. Instead we look at the photo with the vision agent and
+  // fold a precise description into the prompt - words the renderer can use.
   const hasFace = !!input.faceDataUrl;
+  const productPhoto = product.image ? await fileToDataUrl(product.image) : null;
+  const canSendReferences = imageProviderTakesReferences(availableImageProviders()[0]);
+
+  let lookDescription = [product.colorway, product.material].filter(Boolean).join(', ');
+  if (productPhoto && !canSendReferences) {
+    try {
+      const { attrs } = await describeImage(productPhoto);
+      lookDescription = [
+        attrs.silhouette,
+        attrs.primary_color,
+        attrs.secondary_colors.length ? `with ${attrs.secondary_colors.join(' and ')} details` : '',
+        attrs.materials.length ? `in ${attrs.materials.join(' and ')}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    } catch (e) {
+      console.warn('[stylist] could not read the product photo, using stored fields:', e.message);
+    }
+  }
+
   const prompt = [
     `Full-length e-commerce try-on photograph of a person wearing the ${product.name}`,
     product.brand ? `by ${product.brand}` : '',
-    `shown in the attached product photo. The footwear must match the attached product photo exactly`,
-    `in colour, shape and detailing.`,
+    `- ${product.category_name.toLowerCase()}${lookDescription ? `, ${lookDescription}` : ''}.`,
+    canSendReferences
+      ? 'The footwear must match the attached product photo exactly in colour, shape and detailing.'
+      : 'The footwear must match that description exactly in colour, shape and detailing.',
     `The person has ${BUILD_BY_SIZE[size]} (size ${size}).`,
-    hasFace
+    hasFace && canSendReferences
       ? 'Use the attached portrait as the reference for the face, keeping the likeness natural and flattering.'
       : 'Use a generic anonymous model; do not depict any identifiable real person.',
     `Styling: ${brief.styling}.`,
@@ -100,11 +127,10 @@ export async function renderTryOn(input) {
     .join(' ');
 
   const images = [];
-  if (product.image) {
-    const asDataUrl = await fileToDataUrl(product.image);
-    if (asDataUrl) images.push(asDataUrl);
+  if (canSendReferences) {
+    if (productPhoto) images.push(productPhoto);
+    if (hasFace) images.push(input.faceDataUrl);
   }
-  if (hasFace) images.push(input.faceDataUrl);
 
   const image = await generateImage({ prompt, images, size: '1K' });
   if (!image) throw Object.assign(new Error('image generation returned no image'), { status: 502 });
@@ -114,8 +140,9 @@ export async function renderTryOn(input) {
     product: { id: product.id, name: product.name, brand: product.brand },
     size,
     brief,
-    usedFace: hasFace,
+    usedFace: hasFace && canSendReferences,
     disclaimer: 'AI-generated preview. Fit and colour may differ from the real product.',
+    imageProvider: image.provider,
     meta: briefMeta,
   };
 }

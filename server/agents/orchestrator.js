@@ -120,7 +120,7 @@ export const REGISTRY = {
     run: async (p) => {
       const r = await renderTryOn(p);
       return {
-        data: { image: r.image.dataUrl, product: r.product, size: r.size, disclaimer: r.disclaimer, usedFace: r.usedFace },
+        data: { image: r.image.dataUrl, product: r.product, size: r.size, disclaimer: r.disclaimer, usedFace: r.usedFace, imageProvider: r.imageProvider },
         meta: r.meta,
         flags: r.usedFace ? ['selfie_used_transient'] : [],
       };

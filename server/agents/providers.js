@@ -324,6 +324,47 @@ async function geminiImage({ prompt, images, size }) {
   throw new Error('gemini returned no image part');
 }
 
+/**
+ * Hugging Face router. Free-tier friendly and the default image provider.
+ *
+ * Note: the free tier only reaches TEXT-TO-IMAGE models (image editing lives
+ * on paid providers like fal-ai). So this ignores reference images - the
+ * stylist compensates by describing the product photo in words first.
+ */
+async function huggingfaceImage({ prompt }) {
+  const provider = process.env.HF_IMAGE_PROVIDER || 'nscale';
+  const model = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-schnell';
+
+  const res = await fetch(`https://router.huggingface.co/${provider}/v1/images/generations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.HF_API_KEY}` },
+    body: JSON.stringify({ model, prompt: prompt.slice(0, 2000), response_format: 'b64_json' }),
+    signal: AbortSignal.timeout(150000),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error?.message || json?.error || `HTTP ${res.status}`);
+
+  const item = json.data?.[0];
+  const b64 = item?.b64_json;
+  if (b64) return { dataUrl: `data:image/png;base64,${b64}`, mime: 'image/png', base64: b64, provider: 'huggingface' };
+
+  // Some providers hand back a URL instead of inline bytes.
+  if (item?.url) {
+    const img = await fetch(item.url, { signal: AbortSignal.timeout(60000) });
+    const buf = Buffer.from(await img.arrayBuffer());
+    const mime = img.headers.get('content-type') || 'image/png';
+    const b = buf.toString('base64');
+    return { dataUrl: `data:${mime};base64,${b}`, mime, base64: b, provider: 'huggingface' };
+  }
+  throw new Error('huggingface returned no image');
+}
+
+/** Whether a provider can actually condition on reference images. */
+export function imageProviderTakesReferences(name) {
+  return name === 'gemini' || name === 'openai';
+}
+
 async function openaiImage({ prompt, images }) {
   const key = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
@@ -369,31 +410,41 @@ async function openaiImage({ prompt, images }) {
  * then OpenAI. Returns { dataUrl, mime, base64, provider }.
  * Throws with every provider's reason if none can produce an image.
  */
+const IMAGE_RUNNERS = {
+  huggingface: { key: 'HF_API_KEY', run: huggingfaceImage },
+  gemini: { key: 'GEMINI_API_KEY', run: geminiImage },
+  openai: { key: 'OPENAI_API_KEY', run: openaiImage },
+};
+
+/** Image providers in the configured order, skipping unconfigured ones. */
+export function availableImageProviders() {
+  return (process.env.AI_IMAGE_PROVIDER_ORDER || 'huggingface,gemini')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((name) => IMAGE_RUNNERS[name] && process.env[IMAGE_RUNNERS[name].key]);
+}
+
 export async function generateImage({ prompt, images = [], size = '1K' }) {
+  const chain = availableImageProviders();
+  if (!chain.length) {
+    throw Object.assign(
+      new Error('no image provider configured - set HF_API_KEY, GEMINI_API_KEY or OPENAI_API_KEY'),
+      { status: 502 }
+    );
+  }
+
   const attempts = [];
-
-  if (process.env.GEMINI_API_KEY) {
+  for (const name of chain) {
     try {
-      return await geminiImage({ prompt, images, size });
+      return await IMAGE_RUNNERS[name].run({ prompt, images, size });
     } catch (e) {
-      attempts.push(`gemini: ${e.message}`);
-      console.warn('[ai] gemini image failed:', e.message);
-    }
-  }
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      return await openaiImage({ prompt, images });
-    } catch (e) {
-      attempts.push(`openai: ${e.message}`);
-      console.warn('[ai] openai image failed:', e.message);
+      attempts.push(`${name}: ${e.message}`);
+      console.warn(`[ai] ${name} image failed:`, e.message);
     }
   }
 
-  const err = new Error(
-    attempts.length
-      ? `no image provider could render this: ${attempts.join(' | ')}`
-      : 'no image provider configured - set GEMINI_API_KEY or OPENAI_API_KEY'
+  throw Object.assign(
+    new Error(`no image provider could render this: ${attempts.join(' | ')}`),
+    { status: 502 }
   );
-  err.status = 502;
-  throw err;
 }
