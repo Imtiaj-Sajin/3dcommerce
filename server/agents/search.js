@@ -29,11 +29,13 @@ const strList = (max, len) =>
     z.array(z.string().max(len))
   );
 
+// 0 means "no limit", not "free": models routinely answer 0 for an absent
+// bound, and max_price_cents = 0 would filter the entire catalogue away.
 const cents = z.preprocess((v) => {
   if (v === null || v === undefined || v === '') return null;
   const n = Math.round(Number(v));
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}, z.number().int().nonnegative().nullable());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}, z.number().int().positive().nullable());
 
 export const filterSchema = z.object({
   keywords: strList(8, 40),
@@ -47,22 +49,32 @@ export const filterSchema = z.object({
   explanation: z.preprocess((v) => String(v ?? '').slice(0, 240), z.string().max(240)),
 });
 
-const SYSTEM = `You convert a shopper's sentence into catalogue search filters for a sneaker store.
+const SYSTEM = `You convert a shopper's sentence into catalogue search filters for
+METAMART, a virtual mall selling footwear and clothing across several stores.
 - Use ONLY brands and category slugs from the provided lists; drop anything else.
 - Prices are integers in cents ($150 = 15000).
+- Use null for a price bound the shopper did not give. NEVER use 0 - a
+  max_price_cents of 0 would hide every product.
 - "cheap"/"budget" implies max_price_cents around 10000; "premium" implies min_price_cents around 18000.
-- Put descriptive words (silhouette, vibe, use case) into keywords.
+- Put descriptive words (garment type, silhouette, vibe, use case) into keywords.
 - explanation: one short sentence describing what you searched for, addressed to the shopper.
 - Reply with a single JSON object and nothing else.`;
 
 /** Ask the model for filters (falls back to plain keyword search on failure). */
-export async function planSearch(rawQuery, spaceId) {
+export async function planSearch(rawQuery, spaceId = null) {
   const screened = screenInput(rawQuery, { field: 'query', maxChars: 500 });
 
-  const [brands, cats] = await Promise.all([
-    q(`SELECT DISTINCT brand FROM products WHERE space_id = ? AND brand IS NOT NULL AND status='active'`, [spaceId]),
-    q(`SELECT slug, name FROM categories WHERE space_id = ? AND is_active = 1`, [spaceId]),
-  ]);
+  const [brands, cats] = spaceId
+    ? await Promise.all([
+        q(`SELECT DISTINCT brand FROM products WHERE space_id = ? AND brand IS NOT NULL AND status='active'`, [spaceId]),
+        q(`SELECT slug, name FROM categories WHERE space_id = ? AND is_active = 1`, [spaceId]),
+      ])
+    : await Promise.all([
+        q(`SELECT DISTINCT p.brand FROM products p JOIN spaces s ON s.id=p.space_id
+            WHERE p.brand IS NOT NULL AND p.status='active' AND s.status='live'`),
+        q(`SELECT DISTINCT c.slug, c.name FROM categories c JOIN spaces s ON s.id=c.space_id
+            WHERE c.is_active=1 AND s.status='live'`),
+      ]);
 
   const user = [
     `Brands available: ${brands.map((b) => b.brand).join(', ') || '(none)'}`,
@@ -85,10 +97,18 @@ export async function planSearch(rawQuery, spaceId) {
   return { filters: valid.data, meta: res, flags: screened.flags, cleanQuery: screened.text };
 }
 
-/** Execute validated filters against the catalogue. */
+/**
+ * Execute validated filters against the catalogue.
+ * A null spaceId searches every live store, not just the one you stand in -
+ * a shopper looking for a shirt should find it from inside the sneaker shop.
+ */
 export async function runFilters(filters, spaceId, limit = 24) {
-  const where = ['p.space_id = ?', "p.status = 'active'"];
-  const params = [spaceId];
+  const where = ["p.status = 'active'", "s.status = 'live'"];
+  const params = [];
+  if (spaceId) {
+    where.push('p.space_id = ?');
+    params.push(spaceId);
+  }
 
   const terms = [...(filters.keywords || []), ...(filters.colors || [])].filter(Boolean);
   if (terms.length) {
@@ -127,9 +147,11 @@ export async function runFilters(filters, spaceId, limit = 24) {
   const rows = await q(
     `SELECT p.id, p.slug, p.name, p.brand, p.short_description, p.price_cents, p.currency,
             p.badge, p.category_id, p.space_id, c.slug AS category_slug, c.name AS category_name,
-            c.accent_color, i.file_path AS image
+            c.accent_color, i.file_path AS image,
+            s.slug AS space_slug, s.name AS space_name, s.accent_color AS space_accent
        FROM products p
        JOIN categories c ON c.id = p.category_id
+       JOIN spaces s     ON s.id = p.space_id
        LEFT JOIN product_search ps ON ps.product_id = p.id
        LEFT JOIN product_images i ON i.product_id = p.id AND i.is_primary = 1
       WHERE ${where.join(' AND ')}

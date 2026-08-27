@@ -52,7 +52,8 @@ export const REGISTRY = {
     role: 'public',
     cost: 'low',
     input: z.object({
-      spaceId: z.number().int().positive(),
+      // null = search the whole mall, not just the store you are standing in
+      spaceId: z.number().int().positive().nullable().default(null),
       query: z.string().min(1).max(500),
       limit: z.number().int().min(1).max(48).default(24),
     }),
@@ -81,7 +82,7 @@ export const REGISTRY = {
     role: 'public',
     cost: 'medium',
     input: z.object({
-      spaceId: z.number().int().positive(),
+      spaceId: z.number().int().positive().nullable().default(null),
       imageDataUrl: z.string().min(32),
       limit: z.number().int().min(1).max(24).default(12),
     }),

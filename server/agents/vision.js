@@ -95,10 +95,15 @@ export async function searchByImage(imageDataUrl, spaceId, limit = 12) {
   let brands = [];
   if (attrs.brand_guess) {
     const guess = attrs.brand_guess.toLowerCase().trim();
-    const known = await q(
-      `SELECT DISTINCT brand FROM products WHERE space_id = ? AND brand IS NOT NULL AND status = 'active'`,
-      [spaceId]
-    );
+    const known = spaceId
+      ? await q(
+          `SELECT DISTINCT brand FROM products WHERE space_id = ? AND brand IS NOT NULL AND status='active'`,
+          [spaceId]
+        )
+      : await q(
+          `SELECT DISTINCT p.brand FROM products p JOIN spaces s ON s.id = p.space_id
+            WHERE p.brand IS NOT NULL AND p.status='active' AND s.status='live'`
+        );
     brands = known.map((b) => b.brand).filter((b) => {
       const n = b.toLowerCase();
       return n === guess || n.includes(guess) || guess.includes(n);

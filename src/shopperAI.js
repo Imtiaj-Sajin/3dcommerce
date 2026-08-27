@@ -5,7 +5,7 @@
 // plain keyword query server-side, and the try-on button just reports why.
 
 import { aiSearch, aiSearchImage, aiTryOn, plainSearch } from './api.js';
-import { getProduct } from './products.js';
+import { getProduct, SPACE } from './products.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -43,10 +43,11 @@ export class ShopperAI {
    * @param {import('./ui.js').UI} opts.ui
    * @param {(id:string)=>void} [opts.onWalkTo] walk the player to a product
    */
-  constructor({ space, ui, onWalkTo }) {
+  constructor({ space, ui, onWalkTo, onVisitSpace }) {
     this.space = space;
     this.ui = ui;
     this.onWalkTo = onWalkTo;
+    this.onVisitSpace = onVisitSpace;
     this.faceDataUrl = null;
     this.busy = false;
     this._bind();
@@ -107,6 +108,11 @@ export class ShopperAI {
     $('#search-panel')?.classList.add('hidden');
   }
 
+  /** Walk the player to a product in THIS space (used by deep links). */
+  walkToProduct(slug) {
+    this.onWalkTo?.(slug);
+  }
+
   _showResults(title, note, results) {
     $('#sp-title').textContent = title;
     $('#sp-note').textContent = note || '';
@@ -118,6 +124,7 @@ export class ShopperAI {
     }
 
     for (const r of results) {
+      const here = !r.spaceSlug || r.spaceSlug === (SPACE?.slug ?? this.space);
       const row = document.createElement('div');
       row.className = 'sp-row';
       row.innerHTML = `
@@ -125,16 +132,18 @@ export class ShopperAI {
         <div>
           <div class="nm">${r.name}</div>
           <div class="mt">${r.brand ?? ''}${r.categoryName ? ' · ' + r.categoryName : ''}</div>
+          ${here ? '' : `<div class="store" style="--sa:${r.spaceAccent ?? '#8b93a7'}">${r.spaceName} ↗</div>`}
         </div>
         <div class="pr">${money(r.finalPrice)}${r.onSale ? `<s>${money(r.price)}</s>` : ''}</div>`;
       row.addEventListener('click', () => {
-        // The product may not be on a wall (it could be on the island), so
-        // open the card either way and walk over when we know where it is.
-        if (getProduct(r.slug)) {
+        if (here && getProduct(r.slug)) {
           this.onWalkTo?.(r.slug);
           this.ui.openProduct(r.slug);
+        } else if (r.spaceSlug) {
+          // It lives in another store - go there and open it on arrival.
+          this.onVisitSpace?.(r.spaceSlug, r.slug, r.spaceName);
         } else {
-          this.ui.toast(`${r.name} is not on display in this space`);
+          this.ui.toast(`${r.name} is not on display here`);
         }
       });
       wrap.appendChild(row);
@@ -150,7 +159,7 @@ export class ShopperAI {
     this.busy = true;
     this._showResults('Searching…', query, []);
     try {
-      const r = await aiSearch(this.space, query);
+      const r = await aiSearch('all', query);
       const results = r.data?.results ?? [];
       const note = r.data?.degraded
         ? 'Keyword results (the assistant was unavailable).'
@@ -159,7 +168,7 @@ export class ShopperAI {
     } catch (err) {
       // Last-resort: the plain SQL search needs no model at all.
       try {
-        const results = await plainSearch(this.space, query);
+        const results = await plainSearch('all', query);
         this._showResults(`${results.length} results`, 'Keyword results.', results);
       } catch {
         this._showResults('Search failed', err.message, []);
@@ -177,7 +186,7 @@ export class ShopperAI {
 
     try {
       const dataUrl = await fileToDataUrl(file);
-      const r = await aiSearchImage(this.space, dataUrl);
+      const r = await aiSearchImage('all', dataUrl);
       const a = r.data?.attrs;
       const results = r.data?.results ?? [];
       const seen = a

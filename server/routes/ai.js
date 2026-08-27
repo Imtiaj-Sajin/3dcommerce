@@ -29,8 +29,9 @@ const ctxOf = (req) => ({
   ip: (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString(),
 });
 
+/** Resolve a space reference. 'all' (or nothing) means the whole mall. */
 async function spaceIdOf(slugOrId) {
-  if (!slugOrId) return null;
+  if (!slugOrId || slugOrId === 'all') return null;
   const row = await one('SELECT id FROM spaces WHERE slug = ? OR id = ?', [String(slugOrId), Number(slugOrId) || 0]);
   return row?.id ?? null;
 }
@@ -73,7 +74,9 @@ router.post('/ask', async (req, res) => {
 
 router.post('/search', async (req, res) => {
   try {
-    const spaceId = await spaceIdOf(req.body.space || 'solespace');
+    // Default to the whole mall: a shopper hunting for a shirt should find it
+    // from inside the sneaker shop.
+    const spaceId = await spaceIdOf(req.body.space);
     const out = await runAgent(
       'search',
       { spaceId, query: String(req.body.query || ''), limit: Number(req.body.limit) || 24 },
@@ -87,7 +90,7 @@ router.post('/search', async (req, res) => {
 
 router.post('/search-image', async (req, res) => {
   try {
-    const spaceId = await spaceIdOf(req.body.space || 'solespace');
+    const spaceId = await spaceIdOf(req.body.space);
     const out = await runAgent(
       'vision',
       { spaceId, imageDataUrl: String(req.body.image || ''), limit: Number(req.body.limit) || 12 },

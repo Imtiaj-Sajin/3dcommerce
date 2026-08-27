@@ -213,16 +213,34 @@ export function buildConcourse(scene, ctx) {
   const { floorMaterial, concTex, shaftTex, interactables, colliders, pulsing } = ctx;
   const tenantDirectory = ctx.directory ?? [];
 
-  // The bay plaques show whatever the database says about each tenant, so a
-  // store that goes live in /admin reads NOW OPEN out here without a rebuild.
-  // TENANTS stays as the fallback for the bay's position and house colour.
-  const liveBySlug = new Map(tenantDirectory.map((s) => [s.slug, s]));
+  // The plaza is shared by every store, so it has to be drawn from the point
+  // of view of whichever one you are standing in:
+  //   - the gate leads back into THIS store, so it wears this store's name
+  //   - the nine bays are every OTHER store, which is what frees a slot for
+  //     SoleSpace once you are inside a tenant
+  const currentSlug = ctx.currentSpace?.slug ?? 'solespace';
+
+  const bays = (() => {
+    const others = tenantDirectory.filter((s) => s.slug !== currentSlug && s.status !== 'hidden');
+    const slots = new Array(BAY_COUNT).fill(null);
+    for (const s of others) {
+      if (s.bay_index != null && s.bay_index >= 0 && s.bay_index < BAY_COUNT) slots[s.bay_index] = s;
+    }
+    // Anchor stores have no bay of their own; drop them into whatever slot
+    // the store you are currently inside has vacated.
+    const anchors = others.filter((s) => s.bay_index == null);
+    for (let i = 0; i < BAY_COUNT && anchors.length; i++) {
+      if (!slots[i]) slots[i] = anchors.shift();
+    }
+    return slots;
+  })();
+
   const tenantAt = (i) => {
+    const live = bays[i];
     const base = TENANTS[i];
-    const live = liveBySlug.get(base.id);
     if (!live) return { ...base, status: 'upcoming' };
     return {
-      id: base.id,
+      id: live.slug,
       name: (live.name || base.name).toUpperCase(),
       accent: live.accent_color || base.accent,
       status: live.status === 'live' ? 'open' : 'upcoming',
@@ -466,7 +484,11 @@ export function buildConcourse(scene, ctx) {
     const plaque = new THREE.Mesh(
       new THREE.PlaneGeometry(9.6, 3.6),
       new THREE.MeshBasicMaterial({
-        map: plaqueTexture('SOLESPACE', '#00e5ff', 'open'),
+        map: plaqueTexture(
+          (ctx.currentSpace?.name ?? 'SOLESPACE').toUpperCase(),
+          ctx.currentSpace?.accent ?? '#00e5ff',
+          'open'
+        ),
         transparent: true, toneMapped: false, depthWrite: false,
       })
     );

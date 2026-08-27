@@ -25,6 +25,9 @@ export function shapeProduct(p) {
     slot: p.slot_index ?? 0,
     stock: p.stock ?? 0,
     sizes: p.sizes ?? [],
+    spaceSlug: p.space_slug ?? null,
+    spaceName: p.space_name ?? null,
+    spaceAccent: p.space_accent ?? null,
   };
 }
 

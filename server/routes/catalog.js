@@ -189,25 +189,31 @@ router.get('/products/:id', async (req, res, next) => {
 router.get('/search', async (req, res, next) => {
   try {
     const term = String(req.query.q || '').trim();
-    const spaceSlug = String(req.query.space || 'solespace');
+    const spaceSlug = String(req.query.space || 'all');
     if (!term) return res.json({ results: [] });
 
-    const space = await one('SELECT id FROM spaces WHERE slug = ?', [spaceSlug]);
-    if (!space) return res.status(404).json({ error: 'space_not_found' });
+    let space = null;
+    if (spaceSlug !== 'all') {
+      space = await one('SELECT id FROM spaces WHERE slug = ?', [spaceSlug]);
+      if (!space) return res.status(404).json({ error: 'space_not_found' });
+    }
 
     const like = `%${term}%`;
     const rows = await q(
       `SELECT p.id, p.slug, p.name, p.brand, p.short_description, p.price_cents, p.currency,
               p.badge, p.slot_index, p.stock, p.category_id, p.space_id,
               c.slug AS category_slug, c.name AS category_name, c.accent_color,
-              i.file_path AS image
+              i.file_path AS image,
+              s.slug AS space_slug, s.name AS space_name, s.accent_color AS space_accent
          FROM products p
          JOIN categories c ON c.id = p.category_id
+         JOIN spaces s     ON s.id = p.space_id
          LEFT JOIN product_images i ON i.product_id = p.id AND i.is_primary = 1
-        WHERE p.space_id = ? AND p.status = 'active'
+        WHERE p.status = 'active' AND s.status = 'live'
+          ${space ? 'AND p.space_id = ?' : ''}
           AND (p.name LIKE ? OR p.brand LIKE ? OR p.short_description LIKE ? OR c.name LIKE ?)
         LIMIT 24`,
-      [space.id, like, like, like, like]
+      space ? [space.id, like, like, like, like] : [like, like, like, like]
     );
     res.json({ results: applyPricing(rows, await activeDiscounts()).map(shape) });
   } catch (e) { next(e); }

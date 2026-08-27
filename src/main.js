@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildShop, VIEWPOINTS, viewpointForSlot } from './shop.js';
 import { TENANTS } from './concourse.js';
-import { loadSpaceCatalogue, CATEGORIES, HIGHLIGHT, SPACE } from './products.js';
+import { loadSpaceCatalogue, CATEGORIES, HIGHLIGHT, SPACE, getProduct } from './products.js';
 import { fetchSpaces } from './api.js';
 import { loadCharacterGLBs, createRig } from './rig.js';
 import { Player } from './player.js';
@@ -74,7 +74,7 @@ try {
 applySpaceBranding();
 buildZoneNav();
 
-const shop = buildShop(scene, camera, directory);
+const shop = buildShop(scene, camera, directory, SPACE);
 const chaseCam = new ThirdPersonCamera(camera, canvas);
 
 let player = null;
@@ -154,6 +154,12 @@ const shopperAI = new ShopperAI({
     player.setDestination(spot);
     shopperAI.closePanel();
   },
+  // A search hit that lives in another store: travel there and open it on
+  // arrival, so the result is one click away wherever you searched from.
+  onVisitSpace: (slug, productSlug, storeName) => {
+    ui.toast(`${storeName ?? 'Store'} — taking you there…`);
+    enterSpace(slug, productSlug);
+  },
 });
 
 // Reset the try-on panel whenever a different product card is opened.
@@ -181,7 +187,7 @@ const interactions = new Interactions(camera, canvas, shop.interactables, {
 
 let entering = false;
 
-function enterSpace(slug) {
+function enterSpace(slug, openProductSlug = null) {
   if (entering) return;
   const entry = directory.find((s) => s.slug === slug);
   const tenant = TENANTS.find((t) => t.id === slug);
@@ -202,7 +208,9 @@ function enterSpace(slug) {
   wipe.style.setProperty('--tr', entry.accent_color || '#00e5ff');
   wipe.classList.add('on');
   setTimeout(() => {
-    location.search = `?space=${encodeURIComponent(slug)}`;
+    const q = new URLSearchParams({ space: slug });
+    if (openProductSlug) q.set('product', openProductSlug);
+    location.search = `?${q}`;
   }, 430);
 }
 
@@ -270,10 +278,23 @@ loadCharacterGLBs(['Knight', 'Barbarian', 'Rogue'])
     if (import.meta.env.DEV) {
       window.__solespace = { scene, camera, shop, ui, player, visitors, cam: chaseCam };
     }
-    setTimeout(
-      () => ui.toast(`Welcome to ${SPACE.name} — WASD to walk, drag to orbit, click a product 👟`),
-      1600
-    );
+    const wanted = new URLSearchParams(location.search).get('product');
+    if (wanted) {
+      // Arrived here from a search hit in another store - go straight to it.
+      setTimeout(() => {
+        if (!getProduct(wanted)) {
+          ui.toast('That product is no longer on display here');
+          return;
+        }
+        shopperAI.walkToProduct(wanted);
+        ui.openProduct(wanted);
+      }, 900);
+    } else {
+      setTimeout(
+        () => ui.toast(`Welcome to ${SPACE.name} — WASD to walk, drag to orbit, click a product 👟`),
+        1600
+      );
+    }
   })
   .catch((err) => {
     console.error('Could not load character models:', err);
