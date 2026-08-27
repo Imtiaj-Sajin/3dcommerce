@@ -37,6 +37,9 @@ export const aiSearchImage = (space, image) => post('/api/ai/search-image', { sp
 export const aiTryOn = (productId, size, face) => post('/api/ai/try-on', { productId, size, face });
 export const aiAsk = (space, message) => post('/api/ai/ask', { space, message });
 
+/** One turn with the concierge. */
+export const aiChat = (body) => post('/api/ai/chat', body);
+
 /** Plain keyword search - no model, no cost. */
 export const plainSearch = (space, q) =>
   get(`/api/search?space=${encodeURIComponent(space)}&q=${encodeURIComponent(q)}`).then((r) => r.results);

@@ -14,6 +14,7 @@ import { ThirdPersonCamera } from './cameraRig.js';
 import { Interactions } from './interactions.js';
 import { UI } from './ui.js';
 import { ShopperAI } from './shopperAI.js';
+import { Concierge } from './concierge.js';
 
 const canvas = document.getElementById('scene');
 
@@ -139,19 +140,24 @@ const ui = new UI({
  * Search bar, photo search and the try-on preview. Clicking a result walks
  * the player over to that pedestal before opening the card. */
 
+/** Walk the player to a product's pedestal in this space. */
+function walkToProduct(productId) {
+  const view = shop.productViews.get(productId);
+  if (!view || !player) return;
+  const spot = new THREE.Vector3();
+  view.group.getWorldPosition(spot);
+  // stop a step short of the pedestal so the card stays in view
+  const toPlayer = new THREE.Vector3().subVectors(player.root.position, spot).setY(0);
+  if (toPlayer.lengthSq() < 1e-4) toPlayer.set(0, 0, 1);
+  spot.addScaledVector(toPlayer.normalize(), 1.9);
+  player.setDestination(spot);
+}
+
 const shopperAI = new ShopperAI({
   space: spaceSlug,
   ui,
   onWalkTo: (productId) => {
-    const view = shop.productViews.get(productId);
-    if (!view || !player) return;
-    const spot = new THREE.Vector3();
-    view.group.getWorldPosition(spot);
-    // stop a step short of the pedestal so the card stays in view
-    const toPlayer = new THREE.Vector3().subVectors(player.root.position, spot).setY(0);
-    if (toPlayer.lengthSq() < 1e-4) toPlayer.set(0, 0, 1);
-    spot.addScaledVector(toPlayer.normalize(), 1.9);
-    player.setDestination(spot);
+    walkToProduct(productId);
     shopperAI.closePanel();
   },
   // A search hit that lives in another store: travel there and open it on
@@ -162,11 +168,38 @@ const shopperAI = new ShopperAI({
   },
 });
 
-// Reset the try-on panel whenever a different product card is opened.
+/* ---------------- concierge ----------------
+ * The chat assistant. It shares the same navigation callbacks as the search
+ * panel, so a product it names behaves exactly like one you clicked on a wall. */
+
+const concierge = new Concierge({
+  ui,
+  onWalkTo: (slug) => walkToProduct(slug),
+  onVisitSpace: (slug, productSlug, name) => {
+    ui.toast(`${name ?? 'Store'} — taking you there…`);
+    enterSpace(slug, productSlug);
+  },
+  onTryOn: () => {
+    // The product card is already open; run its try-on for them.
+    setTimeout(() => document.getElementById('tryon-btn')?.click(), 350);
+  },
+});
+
+// Reset the try-on panel whenever a different product card is opened, and let
+// the concierge volunteer a preview for anything wearable.
 const openProduct = ui.openProduct.bind(ui);
 ui.openProduct = (id) => {
   openProduct(id);
   shopperAI.resetTryOn();
+  const p = getProduct(id);
+  if (p) {
+    concierge.setShown([p.name]);
+    clearTimeout(openProduct._offer);
+    // Wait a beat - if they are still on this card, it is worth mentioning.
+    openProduct._offer = setTimeout(() => {
+      if (ui.modalOpen && ui.current?.id === id) concierge.offerTryOn(p);
+    }, 6000);
+  }
 };
 
 const interactions = new Interactions(camera, canvas, shop.interactables, {

@@ -102,6 +102,27 @@ router.post('/search-image', async (req, res) => {
   }
 });
 
+router.post('/chat', async (req, res) => {
+  try {
+    const spaceId = await spaceIdOf(req.body.space);
+    const out = await runAgent(
+      'concierge',
+      {
+        message: String(req.body.message || ''),
+        history: Array.isArray(req.body.history) ? req.body.history : [],
+        imageDataUrl: req.body.image || undefined,
+        spaceId,
+        cart: Array.isArray(req.body.cart) ? req.body.cart : [],
+        shown: Array.isArray(req.body.shown) ? req.body.shown : [],
+      },
+      ctxOf(req)
+    );
+    res.json(out);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
 router.post('/try-on', async (req, res) => {
   try {
     const out = await runAgent(

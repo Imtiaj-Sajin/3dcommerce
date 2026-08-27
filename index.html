@@ -142,6 +142,32 @@
     </div>
   </div>
 
+  <!-- Concierge chat -->
+  <button id="chat-fab" title="Ask the concierge">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-4-.9L3 21l1.9-4.5A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+    <span class="fab-dot"></span>
+  </button>
+
+  <aside id="chat-panel" class="hidden">
+    <div class="chat-head">
+      <div>
+        <h3>Concierge</h3>
+        <p class="chat-sub">Ask for anything, or send a photo</p>
+      </div>
+      <button id="chat-close" title="Close">✕</button>
+    </div>
+    <div id="chat-log"></div>
+    <div id="chat-chips"></div>
+    <form id="chat-form">
+      <button type="button" id="chat-photo" title="Send a photo">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input id="chat-input" type="text" placeholder="What are you after today?" autocomplete="off" />
+      <button type="submit" id="chat-send" title="Send">↑</button>
+      <input id="chat-file" type="file" accept="image/*" hidden />
+    </form>
+  </aside>
+
   <!-- Doorway prompt + space transition -->
   <div id="enter-prompt" class="hidden">
     <div class="ep-name"></div>

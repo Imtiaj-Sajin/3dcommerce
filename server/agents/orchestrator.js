@@ -19,6 +19,7 @@ import { planSearch, runFilters, plainSearch } from './search.js';
 import { searchByImage } from './vision.js';
 import { suggestHighlight } from './merchandiser.js';
 import { renderTryOn } from './stylist.js';
+import { chat as conciergeChat } from './concierge.js';
 
 /* ------------------------------------------------------------------ */
 /*  registry                                                           */
@@ -106,6 +107,30 @@ export const REGISTRY = {
       const r = await suggestHighlight(p.spaceId, p.brief, p.slots);
       return { data: { picks: r.picks, headline: r.headline, subtitle: r.subtitle }, meta: r.meta, flags: r.flags };
     },
+  },
+
+  concierge: {
+    description: 'Talk to the shopper: understand what they want, find it, and walk them to the checkout.',
+    whenToUse: 'The shopper types in the chat, with or without a photo.',
+    role: 'public',
+    cost: 'medium',
+    input: z.object({
+      message: z.string().max(900).default(''),
+      history: z
+        .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) }))
+        .max(20)
+        .default([]),
+      imageDataUrl: z.string().optional(),
+      spaceId: z.number().int().positive().nullable().default(null),
+      cart: z
+        .array(z.object({ name: z.string().max(160), price: z.number(), size: z.string().max(24).nullable().optional() }))
+        .max(30)
+        .default([]),
+      shown: z.array(z.string().max(120)).max(12).default([]),
+    }).refine((v) => v.message.trim().length > 0 || !!v.imageDataUrl, {
+      message: 'say something or attach a photo',
+    }),
+    run: (p) => conciergeChat(p),
   },
 
   stylist: {

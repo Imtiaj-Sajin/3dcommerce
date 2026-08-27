@@ -16,7 +16,8 @@
     "test:shopper": "node scripts/shopper-smoke.mjs",
     "test:admin": "node scripts/admin-smoke.mjs",
     "apparel:load": "node scripts/load-apparel.mjs",
-    "sql:dump": "node scripts/db-dump.mjs"
+    "sql:dump": "node scripts/db-dump.mjs",
+    "test:chat": "node scripts/chat-smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

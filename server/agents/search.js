@@ -146,7 +146,8 @@ export async function runFilters(filters, spaceId, limit = 24) {
 
   const rows = await q(
     `SELECT p.id, p.slug, p.name, p.brand, p.short_description, p.price_cents, p.currency,
-            p.badge, p.category_id, p.space_id, c.slug AS category_slug, c.name AS category_name,
+            p.badge, p.stock, p.slot_index, p.category_id, p.space_id,
+            c.slug AS category_slug, c.name AS category_name,
             c.accent_color, i.file_path AS image,
             s.slug AS space_slug, s.name AS space_name, s.accent_color AS space_accent
        FROM products p
