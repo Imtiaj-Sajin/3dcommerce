@@ -48,8 +48,19 @@ camera.layers.enable(1); // characters live on layer 1 (skipped by the mirror)
 
 const spaceSlug = new URLSearchParams(location.search).get('space') || 'solespace';
 
+// The mall directory is fetched up front, not lazily: the plaza plaques are
+// built during buildShop() and need to know which tenants are actually open.
+let directory = [];
+
 try {
-  await loadSpaceCatalogue(spaceSlug);
+  const [, dir] = await Promise.all([
+    loadSpaceCatalogue(spaceSlug),
+    fetchSpaces().catch((e) => {
+      console.warn('[metamart] tenant directory unavailable:', e.message);
+      return [];
+    }),
+  ]);
+  directory = dir;
 } catch (err) {
   console.error('[metamart] could not load the catalogue:', err);
   document.getElementById('loader').innerHTML =
@@ -63,7 +74,7 @@ try {
 applySpaceBranding();
 buildZoneNav();
 
-const shop = buildShop(scene, camera);
+const shop = buildShop(scene, camera, directory);
 const chaseCam = new ThirdPersonCamera(camera, canvas);
 
 let player = null;
@@ -167,11 +178,6 @@ const interactions = new Interactions(camera, canvas, shop.interactables, {
  * Entering a bay swaps the whole space: the current one is torn down and the
  * next one is fetched and built. There is no door to open - you walk into the
  * bay and you are there. */
-
-let directory = [];
-fetchSpaces()
-  .then((rows) => { directory = rows; })
-  .catch(() => { /* the plaza still works without status labels */ });
 
 function enterSpace(slug) {
   const entry = directory.find((s) => s.slug === slug);

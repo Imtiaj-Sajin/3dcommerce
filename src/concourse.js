@@ -211,6 +211,23 @@ function drumTexture() {
  */
 export function buildConcourse(scene, ctx) {
   const { floorMaterial, concTex, shaftTex, interactables, colliders, pulsing } = ctx;
+  const tenantDirectory = ctx.directory ?? [];
+
+  // The bay plaques show whatever the database says about each tenant, so a
+  // store that goes live in /admin reads NOW OPEN out here without a rebuild.
+  // TENANTS stays as the fallback for the bay's position and house colour.
+  const liveBySlug = new Map(tenantDirectory.map((s) => [s.slug, s]));
+  const tenantAt = (i) => {
+    const base = TENANTS[i];
+    const live = liveBySlug.get(base.id);
+    if (!live) return { ...base, status: 'upcoming' };
+    return {
+      id: base.id,
+      name: (live.name || base.name).toUpperCase(),
+      accent: live.accent_color || base.accent,
+      status: live.status === 'live' ? 'open' : 'upcoming',
+    };
+  };
 
   // merge buckets — one draw call each
   const wallGeos = [];    // drum + vestibule walls (matte concrete)
@@ -343,7 +360,7 @@ export function buildConcourse(scene, ctx) {
   /* ---------------- drum: nine tenant faces ---------------- */
 
   for (let i = 0; i < BAY_COUNT; i++) {
-    const t = TENANTS[i];
+    const t = tenantAt(i);
     const a = Math.PI + GATE_SPAN / 2 + (i + 0.5) * BAY_SPAN;
     const m4 = faceMatrix(a, APOTHEM);
 
@@ -385,7 +402,7 @@ export function buildConcourse(scene, ctx) {
     const plaque = new THREE.Mesh(
       new THREE.PlaneGeometry(5.4, 2.03),
       new THREE.MeshBasicMaterial({
-        map: plaqueTexture(t.name, t.accent, 'upcoming'),
+        map: plaqueTexture(t.name, t.accent, t.status),
         transparent: true, toneMapped: false, depthWrite: false,
       })
     );

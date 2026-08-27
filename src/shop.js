@@ -220,7 +220,7 @@ export const VIEWPOINTS = {
 
 /* ---------------- main builder ---------------- */
 
-export function buildShop(scene, camera) {
+export function buildShop(scene, camera, directory = []) {
   const interactables = [];
   const productViews = new Map();
   const browsePoints = [];
@@ -631,7 +631,7 @@ export function buildShop(scene, camera) {
 
   /* --- the way out: threshold + the shared concourse --- */
   const concourse = buildConcourse(scene, {
-    floorMaterial, concTex, shaftTex, interactables, colliders, pulsing,
+    floorMaterial, concTex, shaftTex, interactables, colliders, pulsing, directory,
   });
 
   /* --- dust motes --- */
